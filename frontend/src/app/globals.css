@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+/* ─── CareerPilot Design Tokens ─────────────────────────────────────────────── */
+
+:root {
+  /* Brand — Indigo */
+  --color-brand-50:  #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-900: #1e1b4b;
+
+  /* Fit score */
+  --color-fit-high:   #16a34a;
+  --color-fit-medium: #d97706;
+  --color-fit-low:    #dc2626;
+
+  /* Application status */
+  --color-status-applied:      #3b82f6;
+  --color-status-interviewing: #f59e0b;
+  --color-status-offer:        #22c55e;
+  --color-status-rejected:     #ef4444;
+
+  /* Surface */
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --surface:    #f8fafc;
+  --border:     #e2e8f0;
+  --muted:      #94a3b8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a14;
+    --foreground: #f1f5f9;
+    --surface:    #111827;
+    --border:     #1e293b;
+    --muted:      #64748b;
+  }
+}
+
+/* ─── Tailwind Theme Mapping ─────────────────────────────────────────────────── */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface:    var(--surface);
+  --color-border:     var(--border);
+  --color-muted:      var(--muted);
+
+  --color-brand-50:  var(--color-brand-50);
+  --color-brand-100: var(--color-brand-100);
+  --color-brand-500: var(--color-brand-500);
+  --color-brand-600: var(--color-brand-600);
+  --color-brand-700: var(--color-brand-700);
+  --color-brand-900: var(--color-brand-900);
+
+  --color-fit-high:   var(--color-fit-high);
+  --color-fit-medium: var(--color-fit-medium);
+  --color-fit-low:    var(--color-fit-low);
+
+  --color-status-applied:      var(--color-status-applied);
+  --color-status-interviewing: var(--color-status-interviewing);
+  --color-status-offer:        var(--color-status-offer);
+  --color-status-rejected:     var(--color-status-rejected);
+
+  /* Typography */
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-mono), "JetBrains Mono", monospace;
+
+  /* Border radius */
+  --radius-card: 12px;
+}
+
+/* ─── Base Styles ────────────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Scrollbar Styling ───────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* ─── Focus Ring ─────────────────────────────────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Selection ──────────────────────────────────────────────────────────────── */
+
+::selection {
+  background: var(--color-brand-100);
+  color: var(--color-brand-900);
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────────── */
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0);    }
+}
+
+@keyframes pulse-dot {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40%            { transform: scale(1);   opacity: 1;   }
+}
+
+.animate-fade-in      { animation: fade-in 0.3s ease both; }
+.animate-slide-right  { animation: slide-in-right 0.25s ease both; }
+.animate-pulse-dot    { animation: pulse-dot 1.4s ease-in-out infinite; }

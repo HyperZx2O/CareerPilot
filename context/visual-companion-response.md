@@ -1,0 +1,1 @@
+Yes, I'd like to try the visual companion. It would be helpful to see mockups and diagrams as we work through the implementation.
