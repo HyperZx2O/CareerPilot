@@ -120,7 +120,7 @@ class TestCreateApplication:
         assert "applied_at" in body
         assert "updated_at" in body
 
-    def test_create_logs_activity(self, client, db_session):
+    def test_create_logs_activity(self, client, db_session, event_loop):
         """Every POST should insert an 'application_created' row in activity_log."""
         payload = _make_payload()
         client.post("/api/tracker/applications", json=payload)
@@ -139,7 +139,7 @@ class TestCreateApplication:
                 assert len(logs) >= 1
                 assert logs[0].user_id == payload["user_id"]
 
-        asyncio.get_event_loop().run_until_complete(_check())
+        event_loop.run_until_complete(_check())
 
     def test_invalid_status_returns_422(self, client):
         payload = _make_payload(status="banana")
@@ -207,7 +207,7 @@ class TestUpdateApplication:
         assert body["notes"] == "updated note"
         assert body["status"] == created["status"]  # unchanged
 
-    def test_update_logs_activity(self, client, db_session):
+    def test_update_logs_activity(self, client, db_session, event_loop):
         created = self._create_app(client)
         client.patch(
             f"/api/tracker/applications/{created['id']}",
@@ -227,7 +227,7 @@ class TestUpdateApplication:
                 logs = result.scalars().all()
                 assert len(logs) >= 1
 
-        asyncio.get_event_loop().run_until_complete(_check())
+        event_loop.run_until_complete(_check())
 
     def test_invalid_status_on_update_returns_422(self, client):
         created = self._create_app(client)
@@ -280,7 +280,7 @@ class TestDeleteApplication:
         )
         assert resp.json()["applications"] == []
 
-    def test_delete_logs_activity(self, client, db_session):
+    def test_delete_logs_activity(self, client, db_session, event_loop):
         created = self._create_app(client)
         client.delete(f"/api/tracker/applications/{created['id']}")
 
@@ -297,7 +297,7 @@ class TestDeleteApplication:
                 logs = result.scalars().all()
                 assert len(logs) >= 1
 
-        asyncio.get_event_loop().run_until_complete(_check())
+        event_loop.run_until_complete(_check())
 
     def test_delete_nonexistent_returns_404(self, client):
         resp = client.delete(f"/api/tracker/applications/{uuid.uuid4()}")
@@ -310,7 +310,7 @@ class TestDeleteApplication:
 
 class TestActivityLogging:
 
-    def test_all_write_ops_produce_activity_log_entries(self, client, db_session):
+    def test_all_write_ops_produce_activity_log_entries(self, client, db_session, event_loop):
         """POST, PATCH, and DELETE should each log to activity_log."""
         user_id = str(uuid.uuid4())
 
@@ -346,4 +346,4 @@ class TestActivityLogging:
                 assert "application_updated" in actions
                 assert "application_deleted" in actions
 
-        asyncio.get_event_loop().run_until_complete(_check())
+        event_loop.run_until_complete(_check())

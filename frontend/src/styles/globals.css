@@ -1,0 +1,190 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+:root {
+  /* ── Brand palette ── */
+  --cp-bg: #0a0e1a;
+  --cp-surface: #111827;
+  --cp-surface-2: #1a2235;
+  --cp-border: #1e293b;
+  --cp-border-hover: #334155;
+  --cp-text: #f1f5f9;
+  --cp-text-muted: #94a3b8;
+  --cp-text-dim: #64748b;
+
+  --cp-primary: #6366f1;
+  --cp-primary-hover: #818cf8;
+  --cp-primary-glow: rgba(99, 102, 241, 0.15);
+
+  --cp-accent: #06b6d4;
+  --cp-accent-glow: rgba(6, 182, 212, 0.12);
+
+  --cp-success: #22c55e;
+  --cp-warning: #f59e0b;
+  --cp-danger: #ef4444;
+
+  --cp-gradient: linear-gradient(135deg, #6366f1, #06b6d4);
+  --cp-gradient-warm: linear-gradient(135deg, #f59e0b, #ef4444);
+  --cp-gradient-cool: linear-gradient(135deg, #6366f1, #8b5cf6);
+
+  --cp-radius: 12px;
+  --cp-radius-sm: 8px;
+  --cp-radius-lg: 16px;
+  --cp-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+  --cp-shadow-glow: 0 0 30px var(--cp-primary-glow);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--cp-bg);
+  color: var(--cp-text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--cp-bg); }
+::-webkit-scrollbar-thumb {
+  background: var(--cp-border-hover);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--cp-text-dim); }
+
+/* ── Utility classes ── */
+@layer components {
+  .cp-card {
+    @apply rounded-xl border p-5;
+    background: var(--cp-surface);
+    border-color: var(--cp-border);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .cp-card:hover {
+    border-color: var(--cp-border-hover);
+    box-shadow: var(--cp-shadow);
+  }
+
+  .cp-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .cp-btn-primary {
+    background: var(--cp-gradient);
+    color: white;
+    border: none;
+  }
+  .cp-btn-primary:hover {
+    opacity: 0.9;
+    box-shadow: var(--cp-shadow-glow);
+    transform: translateY(-1px);
+  }
+  .cp-btn-ghost {
+    @apply border;
+    background: transparent;
+    color: var(--cp-text-muted);
+    border-color: var(--cp-border);
+  }
+  .cp-btn-ghost:hover {
+    color: var(--cp-text);
+    border-color: var(--cp-border-hover);
+    background: var(--cp-surface-2);
+  }
+
+  .cp-input {
+    @apply w-full rounded-lg border px-4 py-2.5 text-sm outline-none;
+    background: var(--cp-surface-2);
+    border-color: var(--cp-border);
+    color: var(--cp-text);
+    transition: border-color 0.2s;
+  }
+  .cp-input:focus {
+    border-color: var(--cp-primary);
+    box-shadow: 0 0 0 3px var(--cp-primary-glow);
+  }
+  .cp-input::placeholder {
+    color: var(--cp-text-dim);
+  }
+
+  .cp-badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .cp-badge-applied {
+    background: rgba(99, 102, 241, 0.15);
+    color: #818cf8;
+  }
+  .cp-badge-interviewing {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+  }
+  .cp-badge-offer {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+  }
+  .cp-badge-rejected {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+  }
+
+  .cp-progress {
+    @apply h-2 rounded-full overflow-hidden;
+    background: var(--cp-surface-2);
+  }
+  .cp-progress-bar {
+    @apply h-full rounded-full;
+    background: var(--cp-gradient);
+    transition: width 0.5s ease;
+  }
+
+  .cp-glow-text {
+    background: var(--cp-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .cp-sidebar-link {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium;
+    color: var(--cp-text-muted);
+    transition: all 0.2s;
+  }
+  .cp-sidebar-link:hover,
+  .cp-sidebar-link.active {
+    color: var(--cp-text);
+    background: var(--cp-primary-glow);
+  }
+  .cp-sidebar-link.active {
+    color: var(--cp-primary-hover);
+  }
+}
+
+/* ── Animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 15px var(--cp-primary-glow); }
+  50% { box-shadow: 0 0 30px var(--cp-primary-glow); }
+}
+.animate-fade-in { animation: fadeIn 0.4s ease-out; }
+.animate-slide-up { animation: slideUp 0.5s ease-out; }
+.animate-pulse-glow { animation: pulse-glow 2s infinite; }

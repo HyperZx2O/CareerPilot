@@ -1,48 +1,38 @@
 import os
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.orm import declarative_base
+from typing import Generator
+from supabase import create_client, Client as SupabaseClient
+from dotenv import load_dotenv
 
-# Load DATABASE_URL from environment variables
-DATABASE_URL = os.getenv("DATABASE_URL")
+load_dotenv()
 
-if not DATABASE_URL:
-    # Local fallback SQLite database if Supabase environment variables are not yet set
-    DATABASE_URL = "sqlite+aiosqlite:///careerpilot.db"
-elif DATABASE_URL.startswith("postgres://"):
-    # SQLAlchemy requires 'postgresql+asyncpg://' instead of 'postgres://' for async execution
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+# Placeholder for SQLAlchemy Base - models.py/core_models.py still import it
+# but they are no longer used for database operations (Supabase REST used instead)
+Base = None
 
-# Configure SQLAlchemy Async Engine
-_engine_kwargs: dict = {"echo": False}
-if "sqlite" not in DATABASE_URL:
-    _engine_kwargs.update(
-        pool_size=10,
-        max_overflow=20,
-        pool_pre_ping=True,
-        pool_recycle=3600,
-    )
+# Supabase connection settings from environment
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_ANON_KEY", "")
 
-engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
+# Singleton client instance
+_supabase_client: SupabaseClient | None = None
 
-# Configure Sessionmaker
-AsyncSessionLocal = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False
-)
+def get_supabase_client() -> SupabaseClient:
+    """Returns the singleton Supabase client instance."""
+    global _supabase_client
+    if _supabase_client is None:
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            raise RuntimeError(
+                "SUPABASE_URL and SUPABASE_SERVICE_KEY (or SUPABASE_ANON_KEY) "
+                "must be set in environment variables."
+            )
+        _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("[DB] Supabase REST client initialized")
+    return _supabase_client
 
-# Declarative base model
-Base = declarative_base()
 
-async def get_db():
+def get_db() -> Generator[SupabaseClient, None, None]:
     """
-    FastAPI dependency yielding an async database session.
-    Automatically commits transactions on success, or rolls back on exceptions.
+    FastAPI dependency yielding the Supabase client.
+    Kept for backwards compatibility with existing endpoint signatures.
     """
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
+    yield get_supabase_client()

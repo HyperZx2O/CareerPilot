@@ -3,8 +3,6 @@ import sys
 from datetime import date as date_type, datetime, timedelta, timezone
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func as sa_func
 
 # Add root folder to sys.path to find database and models modules
 root_path = Path(__file__).resolve().parent.parent.parent
@@ -18,8 +16,7 @@ try:
 except ImportError:
     get_structured_jobs = None  # type: ignore[assignment]
 
-from backend.db.supabase_client import get_db
-from backend.models.models import Application, ActivityLog, Todo, Goal
+from backend.db.supabase_client import get_supabase_client
 from backend.models.schemas import (
     ApplicationCreate, ApplicationUpdate, ApplicationResponse,
     TodoCreate, TodoUpdate, TodoResponse,
@@ -31,97 +28,95 @@ router = APIRouter(
     tags=["Kanban Tracker"]
 )
 
+
 @router.get("/applications")
 async def get_applications_endpoint(
     user_id: str = Query(..., description="UUID of the user to fetch applications for"),
-    db: AsyncSession = Depends(get_db)
 ):
     """
     Fetches all applications for a user, ordered by applied_at descending.
     """
-    result = await db.execute(
-        select(Application)
-        .where(Application.user_id == user_id)
-        .order_by(Application.applied_at.desc())
-    )
-    applications = result.scalars().all()
-    # Serialize results using Pydantic schemas
-    return {"applications": [ApplicationResponse.model_validate(app) for app in applications]}
+    supabase = get_supabase_client()
+    result = supabase.table("applications").select("*").eq("user_id", user_id).order("applied_at", desc=True).execute()
+    return {"applications": [ApplicationResponse(**app) for app in result.data]}
 
 @router.post("/applications", response_model=ApplicationResponse, status_code=status.HTTP_201_CREATED)
-async def create_application_endpoint(
-    payload: ApplicationCreate,
-    db: AsyncSession = Depends(get_db)
-):
+async def create_application_endpoint(payload: ApplicationCreate):
     """
     Inserts a new job application into the database and writes a row in the activity log.
     """
-    app = Application(**payload.model_dump())
-    db.add(app)
-    await db.flush()  # Populates auto-generated ID and defaults before logging activity
-
+    supabase = get_supabase_client()
+    payload_dict = payload.model_dump()
+    
+    # Insert application
+    result = supabase.table("applications").insert(payload_dict).execute()
+    app_data = result.data[0]
+    
     # Log the activity
-    activity = ActivityLog(user_id=app.user_id, action="application_created")
-    db.add(activity)
-
-    await db.commit()
-    await db.refresh(app)
-    return app
+    supabase.table("activity_log").insert({
+        "user_id": app_data["user_id"],
+        "action": "application_created"
+    }).execute()
+    
+    return ApplicationResponse(**app_data)
 
 @router.patch("/applications/{id}", response_model=ApplicationResponse)
-async def update_application_endpoint(
-    id: str,
-    payload: ApplicationUpdate,
-    db: AsyncSession = Depends(get_db)
-):
+async def update_application_endpoint(id: str, payload: ApplicationUpdate):
     """
     Partially updates an existing application by id. Logs a row in the activity log.
     """
-    result = await db.execute(select(Application).where(Application.id == id))
-    app = result.scalar_one_or_none()
-    if not app:
+    supabase = get_supabase_client()
+    
+    # Fetch existing application
+    result = supabase.table("applications").select("*").eq("id", id).execute()
+    if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Application with ID '{id}' not found."
         )
-
+    app_data = result.data[0]
+    
     # Perform partial update
     update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(app, key, value)
-
+    if update_data:
+        supabase.table("applications").update(update_data).eq("id", id).execute()
+        # Refresh data after update
+        result = supabase.table("applications").select("*").eq("id", id).execute()
+        app_data = result.data[0]
+    
     # Log the activity
-    activity = ActivityLog(user_id=app.user_id, action="application_updated")
-    db.add(activity)
-
-    await db.commit()
-    await db.refresh(app)
-    return app
+    supabase.table("activity_log").insert({
+        "user_id": app_data["user_id"],
+        "action": "application_updated"
+    }).execute()
+    
+    return ApplicationResponse(**app_data)
 
 @router.delete("/applications/{id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_application_endpoint(
-    id: str,
-    db: AsyncSession = Depends(get_db)
-):
+async def delete_application_endpoint(id: str):
     """
     Removes a job application by id. Logs a row in the activity log.
     """
-    result = await db.execute(select(Application).where(Application.id == id))
-    app = result.scalar_one_or_none()
-    if not app:
+    supabase = get_supabase_client()
+    
+    # Fetch existing application
+    result = supabase.table("applications").select("*").eq("id", id).execute()
+    if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Application with ID '{id}' not found."
         )
-
-    user_id = app.user_id
-    await db.delete(app)
-
+    user_id = result.data[0]["user_id"]
+    
+    # Delete application
+    supabase.table("applications").delete().eq("id", id).execute()
+    
     # Log the activity
-    activity = ActivityLog(user_id=user_id, action="application_deleted")
-    db.add(activity)
-
-    await db.commit()
+    supabase.table("activity_log").insert({
+        "user_id": user_id,
+        "action": "application_deleted"
+    }).execute()
+    
     return None
 
 
@@ -129,28 +124,27 @@ async def delete_application_endpoint(
 # Helper: recalculate goal progress based on linked todos
 # ====================================================================
 
-async def _recalculate_goal_progress(goal_id: str, db: AsyncSession) -> None:
+async def _recalculate_goal_progress(goal_id: str) -> None:
     """
     Recomputes a goal's progress field as:
         progress = round(done_count / total_count * 100)
     and persists the update.  Called whenever a linked todo's done status changes.
     """
-    result = await db.execute(select(Goal).where(Goal.id == goal_id))
-    goal = result.scalar_one_or_none()
-    if not goal:
+    supabase = get_supabase_client()
+    
+    # Fetch goal
+    result = supabase.table("goals").select("*").eq("id", goal_id).execute()
+    if not result.data:
         return  # orphaned goal_id – nothing to update
-
-    count_result = await db.execute(
-        select(
-            sa_func.count(Todo.id).label("total"),
-            sa_func.count(
-                sa_func.nullif(Todo.done, False)
-            ).label("done"),
-        ).where(Todo.goal_id == goal_id)
-    )
-    row = count_result.one()
-    total, done = row.total, row.done
-    goal.progress = round(done / total * 100) if total > 0 else 0
+    
+    # Count total and done todos for this goal
+    todos_result = supabase.table("todos").select("done").eq("goal_id", goal_id).execute()
+    todos = todos_result.data
+    total = len(todos)
+    done = sum(1 for t in todos if t.get("done", False))
+    
+    progress = round(done / total * 100) if total > 0 else 0
+    supabase.table("goals").update({"progress": progress}).eq("id", goal_id).execute()
 
 
 # ====================================================================
@@ -161,106 +155,101 @@ async def _recalculate_goal_progress(goal_id: str, db: AsyncSession) -> None:
 async def get_todos_endpoint(
     user_id: str = Query(..., description="UUID of the user"),
     date: str | None = Query(None, description="Filter by due_date (YYYY-MM-DD)"),
-    db: AsyncSession = Depends(get_db),
 ):
     """
     Fetches todos for a user.  If `date` is provided, only returns todos
     whose due_date equals that date.
     """
-    stmt = select(Todo).where(Todo.user_id == user_id)
+    supabase = get_supabase_client()
+    query = supabase.table("todos").select("*").eq("user_id", user_id)
     if date is not None:
-        parsed_date = date_type.fromisoformat(date)
-        stmt = stmt.where(Todo.due_date == parsed_date)
-    stmt = stmt.order_by(Todo.created_at.desc())
-
-    result = await db.execute(stmt)
-    todos = result.scalars().all()
-    return {"todos": [TodoResponse.model_validate(t) for t in todos]}
+        query = query.eq("due_date", date)
+    result = query.order("created_at", desc=True).execute()
+    return {"todos": [TodoResponse(**t) for t in result.data]}
 
 
 @router.post("/todos", response_model=TodoResponse, status_code=status.HTTP_201_CREATED)
-async def create_todo_endpoint(
-    payload: TodoCreate,
-    db: AsyncSession = Depends(get_db),
-):
+async def create_todo_endpoint(payload: TodoCreate):
     """Creates a new todo and logs the activity."""
-    todo = Todo(**payload.model_dump())
-    db.add(todo)
-    await db.flush()
-
-    activity = ActivityLog(user_id=todo.user_id, action="todo_created")
-    db.add(activity)
-
-    await db.commit()
-    await db.refresh(todo)
-    return todo
+    supabase = get_supabase_client()
+    payload_dict = payload.model_dump()
+    
+    result = supabase.table("todos").insert(payload_dict).execute()
+    todo_data = result.data[0]
+    
+    supabase.table("activity_log").insert({
+        "user_id": todo_data["user_id"],
+        "action": "todo_created"
+    }).execute()
+    
+    return TodoResponse(**todo_data)
 
 
 @router.patch("/todos/{id}", response_model=TodoResponse)
-async def update_todo_endpoint(
-    id: str,
-    payload: TodoUpdate,
-    db: AsyncSession = Depends(get_db),
-):
+async def update_todo_endpoint(id: str, payload: TodoUpdate):
     """
     Partially updates a todo.  When `done` changes and the todo has a
     linked goal, the goal's progress is automatically recalculated.
     """
-    result = await db.execute(select(Todo).where(Todo.id == id))
-    todo = result.scalar_one_or_none()
-    if not todo:
+    supabase = get_supabase_client()
+    
+    # Fetch existing todo
+    result = supabase.table("todos").select("*").eq("id", id).execute()
+    if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Todo with ID '{id}' not found.",
         )
-
+    todo_data = result.data[0]
+    
     update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(todo, key, value)
-
+    if update_data:
+        supabase.table("todos").update(update_data).eq("id", id).execute()
+        # Refresh data
+        result = supabase.table("todos").select("*").eq("id", id).execute()
+        todo_data = result.data[0]
+    
     # Log the activity
-    activity = ActivityLog(user_id=todo.user_id, action="todo_updated")
-    db.add(activity)
-
-    await db.flush()
-
+    supabase.table("activity_log").insert({
+        "user_id": todo_data["user_id"],
+        "action": "todo_updated"
+    }).execute()
+    
     # Auto-recalculate linked goal progress when done status changes
-    if "done" in update_data and todo.goal_id:
-        await _recalculate_goal_progress(todo.goal_id, db)
-
-    await db.commit()
-    await db.refresh(todo)
-    return todo
+    if "done" in update_data and todo_data.get("goal_id"):
+        _recalculate_goal_progress(todo_data["goal_id"])
+    
+    return TodoResponse(**todo_data)
 
 
 @router.delete("/todos/{id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_todo_endpoint(
-    id: str,
-    db: AsyncSession = Depends(get_db),
-):
+async def delete_todo_endpoint(id: str):
     """Deletes a todo by id and logs the activity."""
-    result = await db.execute(select(Todo).where(Todo.id == id))
-    todo = result.scalar_one_or_none()
-    if not todo:
+    supabase = get_supabase_client()
+    
+    # Fetch existing todo
+    result = supabase.table("todos").select("*").eq("id", id).execute()
+    if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Todo with ID '{id}' not found.",
         )
-
-    user_id = todo.user_id
-    goal_id = todo.goal_id
-    await db.delete(todo)
-
-    activity = ActivityLog(user_id=user_id, action="todo_deleted")
-    db.add(activity)
-
-    await db.flush()
-
+    todo_data = result.data[0]
+    user_id = todo_data["user_id"]
+    goal_id = todo_data.get("goal_id")
+    
+    # Delete todo
+    supabase.table("todos").delete().eq("id", id).execute()
+    
+    supabase.table("activity_log").insert({
+        "user_id": user_id,
+        "action": "todo_deleted"
+    }).execute()
+    
     # Recalculate linked goal progress after removing a todo
     if goal_id:
-        await _recalculate_goal_progress(goal_id, db)
-
-    await db.commit()
+        _recalculate_goal_progress(goal_id)
+    
     return None
 
 
@@ -269,95 +258,88 @@ async def delete_todo_endpoint(
 # ====================================================================
 
 @router.get("/goals")
-async def get_goals_endpoint(
-    user_id: str = Query(..., description="UUID of the user"),
-    db: AsyncSession = Depends(get_db),
-):
+async def get_goals_endpoint(user_id: str = Query(..., description="UUID of the user")):
     """Fetches all goals for a user."""
-    result = await db.execute(
-        select(Goal)
-        .where(Goal.user_id == user_id)
-        .order_by(Goal.created_at.desc())
-    )
-    goals = result.scalars().all()
-    return {"goals": [GoalResponse.model_validate(g) for g in goals]}
+    supabase = get_supabase_client()
+    result = supabase.table("goals").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+    return {"goals": [GoalResponse(**g) for g in result.data]}
 
 
 @router.post("/goals", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)
-async def create_goal_endpoint(
-    payload: GoalCreate,
-    db: AsyncSession = Depends(get_db),
-):
+async def create_goal_endpoint(payload: GoalCreate):
     """Creates a new goal and logs the activity."""
-    goal = Goal(**payload.model_dump())
-    db.add(goal)
-    await db.flush()
-
-    activity = ActivityLog(user_id=goal.user_id, action="goal_created")
-    db.add(activity)
-
-    await db.commit()
-    await db.refresh(goal)
-    return goal
+    supabase = get_supabase_client()
+    payload_dict = payload.model_dump()
+    
+    result = supabase.table("goals").insert(payload_dict).execute()
+    goal_data = result.data[0]
+    
+    supabase.table("activity_log").insert({
+        "user_id": goal_data["user_id"],
+        "action": "goal_created"
+    }).execute()
+    
+    return GoalResponse(**goal_data)
 
 
 @router.patch("/goals/{id}", response_model=GoalResponse)
-async def update_goal_endpoint(
-    id: str,
-    payload: GoalUpdate,
-    db: AsyncSession = Depends(get_db),
-):
+async def update_goal_endpoint(id: str, payload: GoalUpdate):
     """Partially updates a goal. The `progress` field is validated 0–100 by the schema."""
-    result = await db.execute(select(Goal).where(Goal.id == id))
-    goal = result.scalar_one_or_none()
-    if not goal:
+    supabase = get_supabase_client()
+    
+    # Fetch existing goal
+    result = supabase.table("goals").select("*").eq("id", id).execute()
+    if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Goal with ID '{id}' not found.",
         )
-
+    goal_data = result.data[0]
+    
     update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(goal, key, value)
-
-    activity = ActivityLog(user_id=goal.user_id, action="goal_updated")
-    db.add(activity)
-
-    await db.commit()
-    await db.refresh(goal)
-    return goal
+    if update_data:
+        supabase.table("goals").update(update_data).eq("id", id).execute()
+        # Refresh data
+        result = supabase.table("goals").select("*").eq("id", id).execute()
+        goal_data = result.data[0]
+    
+    supabase.table("activity_log").insert({
+        "user_id": goal_data["user_id"],
+        "action": "goal_updated"
+    }).execute()
+    
+    return GoalResponse(**goal_data)
 
 
 @router.delete("/goals/{id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_goal_endpoint(
-    id: str,
-    db: AsyncSession = Depends(get_db),
-):
+async def delete_goal_endpoint(id: str):
     """
     Deletes a goal and **cascade-deletes** all todos linked to it.
     Logs the activity.
     """
-    result = await db.execute(select(Goal).where(Goal.id == id))
-    goal = result.scalar_one_or_none()
-    if not goal:
+    supabase = get_supabase_client()
+    
+    # Fetch existing goal
+    result = supabase.table("goals").select("*").eq("id", id).execute()
+    if not result.data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Goal with ID '{id}' not found.",
         )
-
-    user_id = goal.user_id
-
+    goal_data = result.data[0]
+    user_id = goal_data["user_id"]
+    
     # Cascade: delete all linked todos first
-    linked_todos = await db.execute(select(Todo).where(Todo.goal_id == id))
-    for todo in linked_todos.scalars().all():
-        await db.delete(todo)
-
-    await db.delete(goal)
-
-    activity = ActivityLog(user_id=user_id, action="goal_deleted")
-    db.add(activity)
-
-    await db.commit()
+    supabase.table("todos").delete().eq("goal_id", id).execute()
+    
+    # Delete goal
+    supabase.table("goals").delete().eq("id", id).execute()
+    
+    supabase.table("activity_log").insert({
+        "user_id": user_id,
+        "action": "goal_deleted"
+    }).execute()
+    
     return None
 
 
@@ -395,33 +377,28 @@ def _fetch_cv_skills_text(cv_id: str) -> str | None:
         return None
 
 
-async def _compute_streak(user_id: str, db: AsyncSession) -> int:
+def _compute_streak(user_id: str) -> int:
     """
     Count consecutive days (from today backwards) where the activity_log
     has at least one entry for the user.  Stops on the first day with
     no entry.
     """
+    supabase = get_supabase_client()
     today = datetime.now(timezone.utc).date()
 
-    # Fetch all distinct activity dates for this user.
-    # Use func.date() which works with both SQLite (string dates) and PostgreSQL.
-    result = await db.execute(
-        select(
-            sa_func.date(ActivityLog.created_at).label("activity_date")
-        )
-        .where(ActivityLog.user_id == user_id)
-        .distinct()
-    )
-    # SQLite returns date strings, PostgreSQL returns date objects — normalise
+    # Fetch all activity entries for this user (select only created_at)
+    result = supabase.table("activity_log").select("created_at").eq("user_id", user_id).execute()
+    
+    # Extract unique dates
     active_dates: set[date_type] = set()
-    for row in result.all():
-        val = row[0]
-        if val is None:
-            continue
-        if isinstance(val, str):
-            active_dates.add(date_type.fromisoformat(val))
-        else:
-            active_dates.add(val if isinstance(val, date_type) else val.date())
+    for row in result.data:
+        created_at = row.get("created_at")
+        if created_at:
+            # Handle both datetime strings and date objects
+            if isinstance(created_at, str):
+                active_dates.add(date_type.fromisoformat(created_at[:10]))
+            else:
+                active_dates.add(created_at if isinstance(created_at, date_type) else created_at.date())
 
     streak = 0
     check_date = today
@@ -440,7 +417,6 @@ async def _compute_streak(user_id: str, db: AsyncSession) -> int:
 async def get_dashboard_stats(
     user_id: str = Query(..., description="UUID of the user"),
     cv_id: str | None = Query(None, description="Optional CV UUID to count skills"),
-    db: AsyncSession = Depends(get_db),
 ):
     """
     Aggregates dashboard statistics from the database:
@@ -449,26 +425,18 @@ async def get_dashboard_stats(
     - roadmap_progress (from goal matching 'roadmap')
     - streak_days (consecutive active days)
     """
+    supabase = get_supabase_client()
     now = datetime.now(timezone.utc)
-    seven_days_ago = now - timedelta(days=7)
-    fourteen_days_ago = now - timedelta(days=14)
+    seven_days_ago = (now - timedelta(days=7)).isoformat()
+    fourteen_days_ago = (now - timedelta(days=14)).isoformat()
 
     # ── Applications this week ─────────────────────────────────────
-    result = await db.execute(
-        select(sa_func.count(Application.id))
-        .where(Application.user_id == user_id)
-        .where(Application.applied_at >= seven_days_ago)
-    )
-    applications_this_week = result.scalar() or 0
+    this_week_result = supabase.table("applications").select("id", count="exact").eq("user_id", user_id).gte("applied_at", seven_days_ago).execute()
+    applications_this_week = this_week_result.count or 0
 
     # ── Applications last week ─────────────────────────────────────
-    result = await db.execute(
-        select(sa_func.count(Application.id))
-        .where(Application.user_id == user_id)
-        .where(Application.applied_at >= fourteen_days_ago)
-        .where(Application.applied_at < seven_days_ago)
-    )
-    applications_last_week = result.scalar() or 0
+    last_week_result = supabase.table("applications").select("id", count="exact").eq("user_id", user_id).gte("applied_at", fourteen_days_ago).lt("applied_at", seven_days_ago).execute()
+    applications_last_week = last_week_result.count or 0
 
     # ── Skills count ───────────────────────────────────────────────
     skills_count = 0
@@ -479,17 +447,11 @@ async def get_dashboard_stats(
             skills_count = len(skills_text.split())
 
     # ── Roadmap progress ───────────────────────────────────────────
-    result = await db.execute(
-        select(Goal.progress)
-        .where(Goal.user_id == user_id)
-        .where(Goal.title.ilike("%roadmap%"))
-        .limit(1)
-    )
-    roadmap_row = result.scalar_one_or_none()
-    roadmap_progress = roadmap_row if roadmap_row is not None else 0
+    roadmap_result = supabase.table("goals").select("progress").eq("user_id", user_id).ilike("title", "%roadmap%").limit(1).execute()
+    roadmap_progress = roadmap_result.data[0]["progress"] if roadmap_result.data else 0
 
     # ── Streak ─────────────────────────────────────────────────────
-    streak_days = await _compute_streak(user_id, db)
+    streak_days = _compute_streak(user_id)
 
     return {
         "applications_this_week": applications_this_week,
@@ -508,22 +470,18 @@ async def get_dashboard_stats(
 async def get_nudge(
     user_id: str = Query(..., description="UUID of the user"),
     cv_id: str | None = Query(None, description="Optional CV UUID for skill-based job search"),
-    db: AsyncSession = Depends(get_db),
 ):
     """
     Proactive nudge: if the user has no activity_log entries in the last
     3 days, fetch matching jobs using CV skills and return a nudge message.
     Otherwise return {message: null, jobs: []}.
     """
-    three_days_ago = datetime.now(timezone.utc) - timedelta(days=3)
+    supabase = get_supabase_client()
+    three_days_ago = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
 
     # Check for recent activity
-    result = await db.execute(
-        select(sa_func.count(ActivityLog.id))
-        .where(ActivityLog.user_id == user_id)
-        .where(ActivityLog.created_at >= three_days_ago)
-    )
-    recent_count = result.scalar() or 0
+    recent_result = supabase.table("activity_log").select("id", count="exact").eq("user_id", user_id).gte("created_at", three_days_ago).execute()
+    recent_count = recent_result.count or 0
 
     if recent_count > 0:
         # User is active — no nudge

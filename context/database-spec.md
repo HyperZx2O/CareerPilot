@@ -97,11 +97,10 @@ class GeminiUnavailableError(Exception): pass
 
 | Property | Value |
 |----------|-------|
-| Provider | RapidAPI — JSearch |
-| Auth | `X-RapidAPI-Key` header (`JSEARCH_API_KEY`) |
-| Base URL | `https://jsearch.p.rapidapi.com/search` |
+| Provider | openwebninja.com — JSearch |
+| Auth | `x-api-key` header (`JSEARCH_API_KEY`) |
+| Base URL | `https://api.openwebninja.com/jsearch/search-v2` |
 | Free tier | 200 requests/month |
-| Paid tier | $10/month for 3,000 requests/month |
 | Rate limit | 10 requests/second |
 | Timeout | 10 seconds |
 
@@ -112,8 +111,7 @@ class GeminiUnavailableError(Exception): pass
 import httpx
 
 JSEARCH_HEADERS = {
-    "X-RapidAPI-Key": os.getenv("JSEARCH_API_KEY"),
-    "X-RapidAPI-Host": "jsearch.p.rapidapi.com"
+    "x-api-key": os.getenv("JSEARCH_API_KEY"),
 }
 
 async def search_jobs(query: str, location: str = "", num_pages: int = 1) -> list[dict]:
@@ -125,13 +123,13 @@ async def search_jobs(query: str, location: str = "", num_pages: int = 1) -> lis
     }
     async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.get(
-            "https://jsearch.p.rapidapi.com/search",
+            "https://api.openwebninja.com/jsearch/search-v2",
             headers=JSEARCH_HEADERS,
             params=params
         )
         response.raise_for_status()
         data = response.json()
-        return [parse_jsearch_job(job) for job in data.get("data", [])]
+        return [parse_jsearch_job(job) for job in data.get("data", {}).get("jobs", data.get("data", []))]
 
 def parse_jsearch_job(raw: dict) -> dict:
     return {
@@ -838,7 +836,7 @@ clean:
 | `CHROMA_HOST` | Yes | Backend | ChromaDB hostname | `chromadb.railway.internal` |
 | `CHROMA_PORT` | Yes | Backend | ChromaDB port | `8001` |
 | `CLERK_SECRET_KEY` | Yes | Backend | Clerk backend secret | `sk_live_...` |
-| `JSEARCH_API_KEY` | Yes | Backend | JSearch (RapidAPI) key | `abc123...` |
+| `JSEARCH_API_KEY` | Yes | Backend | JSearch (openwebninja) key | `abc123...` |
 | `ADZUNA_APP_ID` | No | Backend | Adzuna fallback app ID | `12345` |
 | `ADZUNA_APP_KEY` | No | Backend | Adzuna fallback app key | `abc...` |
 | `ENVIRONMENT` | Yes | Backend | `development/production` | `production` |

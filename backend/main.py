@@ -1,18 +1,25 @@
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from the project root .env BEFORE any other imports
+# that depend on os.getenv (e.g., supabase_client.py reads DATABASE_URL at import time)
+_project_root = Path(__file__).resolve().parent.parent
+load_dotenv(_project_root / ".env")
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Setup system paths to resolve submodules
-root_path = Path(__file__).resolve().parent.parent
+root_path = _project_root
 sys.path.append(str(root_path))
 sys.path.append(str(root_path / "integrations"))
 
-# Import database variables to initialize local schema on startup
-from backend.db.supabase_client import Base, engine, DATABASE_URL
 
 # Import Routers
 from backend.routers.tracker import router as tracker_router
+from backend.routers.cv import router as cv_router
+from backend.routers.chat import router as chat_router
 
 try:
     from backend.routers.jobs import router as jobs_router
@@ -33,27 +40,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-async def startup_event():
-    """
-    FastAPI startup hook.
-    If running in local development mode with SQLite, automatically creates the required tables.
-    """
-    if "sqlite" in DATABASE_URL:
-        print(f"Initializing local SQLite schema at: {DATABASE_URL}")
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
-@app.get("/health", tags=["System"])
 def health_check():
     """Simple API health check endpoint."""
     return {"status": "ok", "environment": "development"}
+
+from backend.routers.settings import router as settings_router
 
 # Include Routers
 if jobs_router is not None:
     app.include_router(jobs_router)
 app.include_router(tracker_router)
+app.include_router(cv_router)
+app.include_router(chat_router)
+app.include_router(settings_router)
 
 if __name__ == "__main__":
     import uvicorn

@@ -83,7 +83,7 @@ class TestCreateTodo:
         resp = client.post("/api/tracker/todos", json=_todo_payload(title=""))
         assert resp.status_code == 422
 
-    def test_create_logs_activity(self, client, db_session):
+    def test_create_logs_activity(self, client, db_session, event_loop):
         client.post("/api/tracker/todos", json=_todo_payload())
 
         async def _check():
@@ -95,7 +95,7 @@ class TestCreateTodo:
                 logs = result.scalars().all()
                 assert len(logs) >= 1
 
-        asyncio.get_event_loop().run_until_complete(_check())
+        event_loop.run_until_complete(_check())
 
 
 class TestListTodos:
@@ -170,7 +170,7 @@ class TestUpdateTodo:
         resp = client.patch(f"/api/tracker/todos/{uuid.uuid4()}", json={"done": True})
         assert resp.status_code == 404
 
-    def test_update_logs_activity(self, client, db_session):
+    def test_update_logs_activity(self, client, db_session, event_loop):
         created = self._create_todo(client)
         client.patch(f"/api/tracker/todos/{created['id']}", json={"done": True})
 
@@ -183,7 +183,7 @@ class TestUpdateTodo:
                 logs = result.scalars().all()
                 assert len(logs) >= 1
 
-        asyncio.get_event_loop().run_until_complete(_check())
+        event_loop.run_until_complete(_check())
 
 
 class TestDeleteTodo:
@@ -210,7 +210,7 @@ class TestDeleteTodo:
         resp = client.delete(f"/api/tracker/todos/{uuid.uuid4()}")
         assert resp.status_code == 404
 
-    def test_delete_logs_activity(self, client, db_session):
+    def test_delete_logs_activity(self, client, db_session, event_loop):
         created = self._create_todo(client)
         client.delete(f"/api/tracker/todos/{created['id']}")
 
@@ -223,7 +223,7 @@ class TestDeleteTodo:
                 logs = result.scalars().all()
                 assert len(logs) >= 1
 
-        asyncio.get_event_loop().run_until_complete(_check())
+        event_loop.run_until_complete(_check())
 
 
 # ====================================================================
@@ -252,7 +252,7 @@ class TestCreateGoal:
         resp = client.post("/api/tracker/goals", json=_goal_payload(title=""))
         assert resp.status_code == 422
 
-    def test_create_logs_activity(self, client, db_session):
+    def test_create_logs_activity(self, client, db_session, event_loop):
         client.post("/api/tracker/goals", json=_goal_payload())
 
         async def _check():
@@ -264,7 +264,7 @@ class TestCreateGoal:
                 logs = result.scalars().all()
                 assert len(logs) >= 1
 
-        asyncio.get_event_loop().run_until_complete(_check())
+        event_loop.run_until_complete(_check())
 
 
 class TestListGoals:
@@ -319,7 +319,7 @@ class TestUpdateGoal:
         resp = client.patch(f"/api/tracker/goals/{uuid.uuid4()}", json={"progress": 10})
         assert resp.status_code == 404
 
-    def test_update_logs_activity(self, client, db_session):
+    def test_update_logs_activity(self, client, db_session, event_loop):
         created = self._create_goal(client)
         client.patch(f"/api/tracker/goals/{created['id']}", json={"progress": 75})
 
@@ -332,7 +332,7 @@ class TestUpdateGoal:
                 logs = result.scalars().all()
                 assert len(logs) >= 1
 
-        asyncio.get_event_loop().run_until_complete(_check())
+        event_loop.run_until_complete(_check())
 
 
 class TestDeleteGoal:
@@ -381,7 +381,7 @@ class TestDeleteGoal:
         resp = client.get("/api/tracker/todos", params={"user_id": user_id})
         assert resp.json()["todos"] == []
 
-    def test_delete_logs_activity(self, client, db_session):
+    def test_delete_logs_activity(self, client, db_session, event_loop):
         created = self._create_goal(client)
         client.delete(f"/api/tracker/goals/{created['id']}")
 
@@ -394,7 +394,7 @@ class TestDeleteGoal:
                 logs = result.scalars().all()
                 assert len(logs) >= 1
 
-        asyncio.get_event_loop().run_until_complete(_check())
+        event_loop.run_until_complete(_check())
 
 
 # ====================================================================
