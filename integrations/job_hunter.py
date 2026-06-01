@@ -15,107 +15,6 @@ def clean_html(text: str) -> str:
     clean = re.sub(r'<[^>]+>', '', text)
     return clean.strip()
 
-def get_mock_jobs_list(query: str) -> list[dict]:
-    """Generates highly realistic and relevant mock jobs based on search keywords."""
-    q = query.lower()
-    if any(k in q for k in ["react", "front", "ui", "web", "design", "next"]):
-        return [
-            {
-                "id": "mock-react-001",
-                "title": "Senior React / Next.js Developer",
-                "company": {"display_name": "Vercel"},
-                "location": {"display_name": "San Francisco, CA (Remote)"},
-                "salary_min": 130000,
-                "salary_max": 170000,
-                "created": "2026-05-25T12:00:00Z",
-                "description": "We are seeking a Senior React Developer to join our frontend architecture team. Experience building glassmorphic/neomorphic UI shells, custom state managers (Zustand/Redux), and Next.js is essential.",
-                "redirect_url": "https://vercel.com/careers"
-            },
-            {
-                "id": "mock-react-002",
-                "title": "Frontend Platform Engineer",
-                "company": {"display_name": "Supabase"},
-                "location": {"display_name": "Singapore (Remote)"},
-                "salary_min": 115000,
-                "salary_max": 155000,
-                "created": "2026-05-26T10:00:00Z",
-                "description": "Join us to shape the UI/UX experience of open-source developers. You will design, build, and support the web dashboard interfaces using React 18+, TanStack Query, and TailwindCSS.",
-                "redirect_url": "https://supabase.com/careers"
-            },
-            {
-                "id": "mock-react-003",
-                "title": "Senior Product & UI Engineer",
-                "company": {"display_name": "Linear"},
-                "location": {"display_name": "Berlin, DE (Hybrid)"},
-                "salary_min": 125000,
-                "salary_max": 160000,
-                "created": "2026-05-27T08:00:00Z",
-                "description": "Build high-performance, micro-interactive, beautifully animated React user interfaces. Deep knowledge of web optimization, layouts, and custom design tokens required.",
-                "redirect_url": "https://linear.app/careers"
-            }
-        ]
-    elif any(k in q for k in ["python", "back", "fastapi", "django", "api", "backend", "ml", "ai"]):
-        return [
-            {
-                "id": "mock-python-001",
-                "title": "FastAPI Backend Architect",
-                "company": {"display_name": "Railway"},
-                "location": {"display_name": "New York, NY (Remote)"},
-                "salary_min": 140000,
-                "salary_max": 185000,
-                "created": "2026-05-25T11:00:00Z",
-                "description": "Build high-speed, concurrent Python microservices using FastAPI, SQLAlchemy, and Celery. You will design PostgreSQL relational schemas and orchestrate Docker deployment templates.",
-                "redirect_url": "https://railway.app/careers"
-            },
-            {
-                "id": "mock-python-002",
-                "title": "AI & Vector Search Engineer",
-                "company": {"display_name": "Pinecone"},
-                "location": {"display_name": "San Francisco, CA"},
-                "salary_min": 160000,
-                "salary_max": 215000,
-                "created": "2026-05-26T09:00:00Z",
-                "description": "Orchestrate RAG vector indices and semantic cosine similarity scoring logic. Integrate large language models (OpenAI/Gemini) to perform automated text-parsing pipelines.",
-                "redirect_url": "https://pinecone.io/careers"
-            },
-            {
-                "id": "mock-python-003",
-                "title": "Backend Python Developer",
-                "company": {"display_name": "GitHub"},
-                "location": {"display_name": "Remote (Worldwide)"},
-                "salary_min": 130000,
-                "salary_max": 170000,
-                "created": "2026-05-27T06:00:00Z",
-                "description": "Scale background worker tasks, automate API routers, and handle secure user authentication (OAuth/JWT) in our core platform services.",
-                "redirect_url": "https://github.com/careers"
-            }
-        ]
-    else:
-        return [
-            {
-                "id": "mock-gen-001",
-                "title": "Full Stack Software Engineer",
-                "company": {"display_name": "Stripe"},
-                "location": {"display_name": "San Francisco, CA"},
-                "salary_min": 145000,
-                "salary_max": 195000,
-                "created": "2026-05-25T10:00:00Z",
-                "description": "Design secure, robust, and highly reliable payment APIs. Work with React on the frontend and Python/FastAPI/Ruby on the backend logic.",
-                "redirect_url": "https://stripe.com/careers"
-            },
-            {
-                "id": "mock-gen-002",
-                "title": "AI Application Developer",
-                "company": {"display_name": "OpenAI"},
-                "location": {"display_name": "San Francisco, CA (Hybrid)"},
-                "salary_min": 180000,
-                "salary_max": 260000,
-                "created": "2026-05-26T08:00:00Z",
-                "description": "Build next-generation interactive AI assistants. Implement low-latency streaming endpoints, custom LLM agents, and semantic retrieval systems.",
-                "redirect_url": "https://openai.com/careers"
-            }
-        ]
-
 # ── JSearch API (openwebninja - Supports Bangladesh) ─────────────────────────
 JSEARCH_API_KEY = os.getenv("JSEARCH_API_KEY", "")
 
@@ -202,7 +101,7 @@ def search_adzuna(query: str, country: str = "gb", results: int = 10) -> list[di
 def get_bangladesh_jobs(query: str, results: int = 10) -> list[dict]:
     """
     Get jobs specifically for Bangladesh using available APIs.
-    Priority: JSearch (openwebninja, supports BD) > Adzuna Singapore > Mock data
+    Priority: JSearch (openwebninja, supports BD) > Adzuna Singapore
     """
     # First try JSearch (openwebninja - supports Bangladesh)
     if JSEARCH_API_KEY and "your_" not in JSEARCH_API_KEY:
@@ -224,14 +123,13 @@ def get_bangladesh_jobs(query: str, results: int = 10) -> list[dict]:
         print(f"[JOB SEARCH] Found {len(jobs)} jobs via Adzuna (Singapore proxy)")
         return jobs
     
-    # Fallback to mock data
-    print("[JOB SEARCH] Using mock job data")
-    return get_mock_jobs_list(query)
+    # Return empty list instead of mock data
+    return []
 
 def search_jobs(query: str, location: str = "bd", results: int = 10) -> list[dict]:
     """
     Search for jobs using the best available API for the location.
-    For Bangladesh (bd), uses JSearch or falls back to Adzuna/mock data.
+    For Bangladesh (bd), uses JSearch or falls back to Adzuna.
     """
     # Handle Bangladesh specially
     if location.lower() in ["bd", "bangladesh", "dhaka"]:
@@ -246,9 +144,6 @@ def search_jobs(query: str, location: str = "bd", results: int = 10) -> list[dic
         country = "gb"
     
     jobs = search_adzuna(query, country, results)
-    if not jobs:
-        return get_mock_jobs_list(query)
-    
     return jobs
 
 async def search_jobs_async(query: str, location: str = "bd", results: int = 10) -> list[dict]:
@@ -269,7 +164,7 @@ async def search_jobs_async(query: str, location: str = "bd", results: int = 10)
     app_key = os.getenv("ADZUNA_APP_KEY")
 
     if not app_id or not app_key or "your_" in app_id or "your_" in app_key:
-        return get_mock_jobs_list(query)
+        return []
 
     url = f"https://api.adzuna.com/v1/api/jobs/{country}/search/1"
     params = {
@@ -289,9 +184,6 @@ async def search_jobs_async(query: str, location: str = "bd", results: int = 10)
             jobs = data.get("results", [])
         except Exception as e:
             print(f"[JOB HUNTER WARNING] Adzuna async API failed: {e}")
-
-    if not jobs:
-        return get_mock_jobs_list(query)
 
     return jobs
 
@@ -339,18 +231,12 @@ async def get_structured_jobs_async(query: str, location: str = "bd") -> list[di
 
 if __name__ == "__main__":
     import json
-    import asyncio
     print("Testing Job Hunter Agent...")
     
     # Test Bangladesh jobs
     print("\n=== Testing Bangladesh Jobs ===")
     bd_jobs = get_structured_jobs("software developer", "bd")
     print(f"Bangladesh: Retrieved {len(bd_jobs)} jobs")
-    
-    # Test mock fallback
-    print("\n=== Testing Mock Jobs ===")
-    mock_jobs = get_mock_jobs_list("react developer")
-    print(f"Mock: Retrieved {len(mock_jobs)} jobs")
     
     for i, job in enumerate(bd_jobs[:3]):
         print(f"\n--- Job Card {i+1} ---")

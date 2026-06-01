@@ -182,7 +182,29 @@ def _parse_and_index_cv_sync(cv_id: str, tmp_path: str = None):
     
     print(f"[CV Worker] Successfully processed and indexed CV '{cv_id}' (Sections: {sections_found}).")
 
-@celery.task(name="process_cv")
-def process_cv(cv_id: str):
-    """Celery background wrapper."""
-    asyncio.run(parse_and_index_cv(cv_id))
+    # 7. Generate AI career goals from CV skills
+    try:
+        skills_content = segments.get("skills", "").strip()
+        if skills_content:
+            from backend.services.goals import generate_career_goals
+            goals = generate_career_goals(skills_content)
+            # Get user_id from CV record
+            user_id = cv_record.get("user_id")
+            if user_id and goals:
+                for g in goals:
+                    insert_data = {
+                        "user_id": user_id,
+                        "title": g["title"],
+                        "description": g.get("description", ""),
+                        "target_role": g.get("target_role", ""),
+                        "priority": g.get("priority", "medium"),
+                        "progress": 0,
+                    }
+                    try:
+                        insert_data["source"] = "ai"
+                    except Exception:
+                        pass  # source column may not exist yet
+                    supabase.table("goals").insert(insert_data).execute()
+                print(f"[CV Worker] Generated {len(goals)} career goals for user {user_id}")
+    except Exception as e:
+        print(f"[CV Worker] Goal generation failed: {e}")

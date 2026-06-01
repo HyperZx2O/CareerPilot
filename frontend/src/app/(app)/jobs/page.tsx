@@ -69,22 +69,24 @@ import { useAppStore } from "@/store/useAppStore";
 export default function JobsPage() {
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("bd");
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const cvId = useAppStore((s) => s.cvId);
+  const jobs = useAppStore((s) => s.jobs);
+  const jobsLoading = useAppStore((s) => s.jobsLoading);
+  const setJobs = useAppStore((s) => s.setJobs);
+  const setJobsLoading = useAppStore((s) => s.setJobsLoading);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     if (!query.trim()) return;
-    setLoading(true);
+    setJobsLoading(true);
     try {
       const results = await searchJobs(query, location, cvId || undefined);
       setJobs(results);
     } catch {
       setJobs([]);
     }
-    setLoading(false);
+    setJobsLoading(false);
     setSearched(true);
   }
 
@@ -114,25 +116,25 @@ export default function JobsPage() {
           <option value="in">India</option>
           <option value="remote">Remote</option>
         </select>
-        <button type="submit" className="cp-btn cp-btn-primary whitespace-nowrap" disabled={loading}>
-          {loading ? "Searching…" : "🔍 Search"}
+        <button type="submit" className="cp-btn cp-btn-primary whitespace-nowrap" disabled={jobsLoading}>
+          {jobsLoading ? "Searching…" : "🔍 Search"}
         </button>
       </form>
 
       {/* Results */}
-      {loading && (
+      {jobsLoading && (
         <div className="flex h-40 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
             style={{ borderColor: "var(--cp-primary)", borderTopColor: "transparent" }} />
         </div>
       )}
-      {!loading && searched && jobs.length === 0 && (
+      {!jobsLoading && searched && jobs.length === 0 && (
         <div className="cp-card text-center py-12">
           <p className="text-xl mb-2">No jobs found</p>
           <p style={{ color: "var(--cp-text-muted)" }}>Try different keywords or location</p>
         </div>
       )}
-      {!loading && jobs.length > 0 && (
+      {!jobsLoading && jobs.length > 0 && (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {jobs.map((job) => <JobCard key={job.id} job={job} />)}
         </div>

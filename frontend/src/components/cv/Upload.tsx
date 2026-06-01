@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import { uploadCV } from '@/lib/api';
+import { useAppStore } from '@/store/useAppStore';
 
 export default function UploadCV() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState('');
+  const setCvId = useAppStore((state) => state.setCvId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
     setStatus('Uploading...');
     try {
-      await uploadCV(file);
+      const result = await uploadCV(file);
+      setCvId(result.id); // Store cvId in localStorage
       setStatus('Uploaded');
     } catch (err) {
       setStatus('Error');

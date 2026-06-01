@@ -1,7 +1,7 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, Union
 from enum import Enum
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class ApplicationStatus(str, Enum):
     applied = "applied"
@@ -60,10 +60,24 @@ class TodoResponse(BaseModel):
     id: str
     user_id: Optional[str] = None
     title: str
-    due_date: Optional[date] = None
+    due_date: Optional[Union[date, str]] = None
     done: bool
     goal_id: Optional[str] = None
     created_at: datetime
+
+    @field_validator("due_date", mode="before")
+    @classmethod
+    def parse_due_date(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, date):
+            return v
+        if isinstance(v, str):
+            try:
+                return date.fromisoformat(v)
+            except ValueError:
+                return v  # Return as-is if parsing fails
+        return v
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -73,10 +87,16 @@ class TodoResponse(BaseModel):
 class GoalCreate(BaseModel):
     user_id: Optional[str] = None
     title: str = Field(..., min_length=1, description="Goal title cannot be empty")
+    description: Optional[str] = Field(None, max_length=120)
+    target_role: Optional[str] = None
+    priority: Optional[str] = Field(None, pattern="^(high|medium|low)$")
     target_date: Optional[date] = None
 
 class GoalUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1)
+    description: Optional[str] = Field(None, max_length=120)
+    target_role: Optional[str] = None
+    priority: Optional[str] = Field(None, pattern="^(high|medium|low)$")
     target_date: Optional[date] = None
     progress: Optional[int] = Field(None, ge=0, le=100)
 
@@ -84,8 +104,12 @@ class GoalResponse(BaseModel):
     id: str
     user_id: Optional[str] = None
     title: str
+    description: Optional[str] = None
+    target_role: Optional[str] = None
+    priority: Optional[str] = None
     target_date: Optional[date] = None
     progress: int
+    source: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

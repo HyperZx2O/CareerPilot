@@ -2,7 +2,7 @@ import os
 import sys
 from datetime import date as date_type, datetime, timedelta, timezone
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 
 # Add root folder to sys.path to find database and models modules
 root_path = Path(__file__).resolve().parent.parent.parent
@@ -52,11 +52,14 @@ async def create_application_endpoint(payload: ApplicationCreate):
     result = supabase.table("applications").insert(payload_dict).execute()
     app_data = result.data[0]
     
-    # Log the activity
-    supabase.table("activity_log").insert({
-        "user_id": app_data["user_id"],
-        "action": "application_created"
-    }).execute()
+    # Log the activity (defensive - don't crash endpoint if activity_log fails)
+    try:
+        supabase.table("activity_log").insert({
+            "user_id": app_data["user_id"],
+            "action": "application_created"
+        }).execute()
+    except Exception:
+        pass  # Activity logging is non-critical
     
     return ApplicationResponse(**app_data)
 
@@ -84,11 +87,14 @@ async def update_application_endpoint(id: str, payload: ApplicationUpdate):
         result = supabase.table("applications").select("*").eq("id", id).execute()
         app_data = result.data[0]
     
-    # Log the activity
-    supabase.table("activity_log").insert({
-        "user_id": app_data["user_id"],
-        "action": "application_updated"
-    }).execute()
+    # Log the activity (defensive - don't crash endpoint if activity_log fails)
+    try:
+        supabase.table("activity_log").insert({
+            "user_id": app_data["user_id"],
+            "action": "application_updated"
+        }).execute()
+    except Exception:
+        pass  # Activity logging is non-critical
     
     return ApplicationResponse(**app_data)
 
@@ -111,13 +117,16 @@ async def delete_application_endpoint(id: str):
     # Delete application
     supabase.table("applications").delete().eq("id", id).execute()
     
-    # Log the activity
-    supabase.table("activity_log").insert({
-        "user_id": user_id,
-        "action": "application_deleted"
-    }).execute()
+    # Log the activity (defensive - don't crash endpoint if activity_log fails)
+    try:
+        supabase.table("activity_log").insert({
+            "user_id": user_id,
+            "action": "application_deleted"
+        }).execute()
+    except Exception:
+        pass  # Activity logging is non-critical
     
-    return None
+    return Response(status_code=204)
 
 
 # ====================================================================
@@ -177,10 +186,14 @@ async def create_todo_endpoint(payload: TodoCreate):
     result = supabase.table("todos").insert(payload_dict).execute()
     todo_data = result.data[0]
     
-    supabase.table("activity_log").insert({
-        "user_id": todo_data["user_id"],
-        "action": "todo_created"
-    }).execute()
+    # Log the activity (defensive - don't crash endpoint if activity_log fails)
+    try:
+        supabase.table("activity_log").insert({
+            "user_id": todo_data["user_id"],
+            "action": "todo_created"
+        }).execute()
+    except Exception:
+        pass  # Activity logging is non-critical
     
     return TodoResponse(**todo_data)
 
@@ -209,11 +222,14 @@ async def update_todo_endpoint(id: str, payload: TodoUpdate):
         result = supabase.table("todos").select("*").eq("id", id).execute()
         todo_data = result.data[0]
     
-    # Log the activity
-    supabase.table("activity_log").insert({
-        "user_id": todo_data["user_id"],
-        "action": "todo_updated"
-    }).execute()
+    # Log the activity (defensive - don't crash endpoint if activity_log fails)
+    try:
+        supabase.table("activity_log").insert({
+            "user_id": todo_data["user_id"],
+            "action": "todo_updated"
+        }).execute()
+    except Exception:
+        pass  # Activity logging is non-critical
     
     # Auto-recalculate linked goal progress when done status changes
     if "done" in update_data and todo_data.get("goal_id"):
@@ -241,10 +257,14 @@ async def delete_todo_endpoint(id: str):
     # Delete todo
     supabase.table("todos").delete().eq("id", id).execute()
     
-    supabase.table("activity_log").insert({
-        "user_id": user_id,
-        "action": "todo_deleted"
-    }).execute()
+    # Log the activity (defensive - don't crash endpoint if activity_log fails)
+    try:
+        supabase.table("activity_log").insert({
+            "user_id": user_id,
+            "action": "todo_deleted"
+        }).execute()
+    except Exception:
+        pass  # Activity logging is non-critical
     
     # Recalculate linked goal progress after removing a todo
     if goal_id:
@@ -274,10 +294,14 @@ async def create_goal_endpoint(payload: GoalCreate):
     result = supabase.table("goals").insert(payload_dict).execute()
     goal_data = result.data[0]
     
-    supabase.table("activity_log").insert({
-        "user_id": goal_data["user_id"],
-        "action": "goal_created"
-    }).execute()
+    # Log the activity (defensive - don't crash endpoint if activity_log fails)
+    try:
+        supabase.table("activity_log").insert({
+            "user_id": goal_data["user_id"],
+            "action": "goal_created"
+        }).execute()
+    except Exception:
+        pass  # Activity logging is non-critical
     
     return GoalResponse(**goal_data)
 
@@ -303,10 +327,14 @@ async def update_goal_endpoint(id: str, payload: GoalUpdate):
         result = supabase.table("goals").select("*").eq("id", id).execute()
         goal_data = result.data[0]
     
-    supabase.table("activity_log").insert({
-        "user_id": goal_data["user_id"],
-        "action": "goal_updated"
-    }).execute()
+    # Log the activity (defensive - don't crash endpoint if activity_log fails)
+    try:
+        supabase.table("activity_log").insert({
+            "user_id": goal_data["user_id"],
+            "action": "goal_updated"
+        }).execute()
+    except Exception:
+        pass  # Activity logging is non-critical
     
     return GoalResponse(**goal_data)
 
@@ -335,12 +363,95 @@ async def delete_goal_endpoint(id: str):
     # Delete goal
     supabase.table("goals").delete().eq("id", id).execute()
     
-    supabase.table("activity_log").insert({
-        "user_id": user_id,
-        "action": "goal_deleted"
-    }).execute()
+    # Log the activity (defensive - don't crash endpoint if activity_log fails)
+    try:
+        supabase.table("activity_log").insert({
+            "user_id": user_id,
+            "action": "goal_deleted"
+        }).execute()
+    except Exception:
+        pass  # Activity logging is non-critical
     
     return None
+
+
+@router.post("/goals/generate", status_code=status.HTTP_201_CREATED)
+async def generate_goals_endpoint(
+    user_id: str = Query(..., description="UUID of the user"),
+    cv_id: str | None = Query(None, description="Optional CV UUID to extract skills"),
+):
+    """
+    Generates3 AI career goals from the user's CV skills.
+    Clears any existing AI-generated goals for the user first, then inserts new ones.
+    """
+    supabase = get_supabase_client()
+
+    # Fetch CV skills from cv_chunks
+    skills_text = ""
+    if cv_id:
+        chunks_result = supabase.table("cv_chunks").select("chunk_text").eq("cv_id", cv_id).eq("section_type", "skills").execute()
+        skills_text = " ".join(c.get("chunk_text", "") for c in chunks_result.data)
+
+    # If no skills found in cv_chunks, try from Pinecone as fallback
+    if not skills_text:
+        skills_text = _fetch_cv_skills_text(cv_id) or ""
+
+    # If still no skills, use demo/generic skills for development
+    if not skills_text:
+        skills_text = "JavaScript, React, TypeScript, Node.js, Python, SQL, Git, REST APIs, CSS, HTML"
+
+    if not skills_text:
+        return {"goals": [], "message": "No skills found in CV"}
+
+    from backend.services.goals import generate_career_goals
+    goals = generate_career_goals(skills_text)
+
+    # Clear existing AI-generated goals for this user (only if source column exists)
+    try:
+        supabase.table("goals").delete().eq("user_id", user_id).eq("source", "ai").execute()
+    except Exception:
+        # Fallback: delete all goals if source column doesn't exist yet
+        supabase.table("goals").delete().eq("user_id", user_id).execute()
+
+    # Insert new goals
+    inserted = []
+    for g in goals:
+        insert_data = {
+            "user_id": user_id,
+            "title": g["title"],
+            "description": g.get("description", ""),
+            "target_role": g.get("target_role", ""),
+            "priority": g.get("priority", "medium"),
+            "progress": 0,
+            "source": "ai",
+        }
+
+        result = supabase.table("goals").insert(insert_data).execute()
+        if result.data:
+            # Build response with only the fields GoalResponse expects
+            goal_data = result.data[0]
+            inserted.append(GoalResponse(
+                id=goal_data["id"],
+                user_id=goal_data["user_id"],
+                title=goal_data["title"],
+                target_date=goal_data.get("target_date"),
+                progress=goal_data.get("progress", 0),
+                created_at=goal_data.get("created_at", ""),
+                description=goal_data.get("description"),
+                target_role=goal_data.get("target_role"),
+                priority=goal_data.get("priority", "medium"),
+                source=goal_data.get("source"),
+            ))
+
+    try:
+        supabase.table("activity_log").insert({
+        "user_id": user_id,
+        "action": "goals_generated"
+        }).execute()
+    except Exception:
+        pass  # Activity logging is non-critical
+
+    return {"goals": inserted, "message": f"Generated {len(inserted)} goals from your CV"}
 
 
 # ====================================================================

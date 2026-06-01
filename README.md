@@ -10,10 +10,9 @@ CareerPilot is an AI-powered job search engine and application tracker designed 
 
 ## Live Demo
 
-- **Frontend Deployment (Vercel)**: `https://careerpilot-frontend.vercel.app` *(Placeholder - Deployment Phase 9 skipped by user)*
-- **Backend API Deployment (Railway)**: `https://careerpilot-backend.railway.app` *(Placeholder - Deployment Phase 9 skipped by user)*
-- **Interactive API Docs**: `https://careerpilot-backend.railway.app/docs` *(Placeholder - Deployment Phase 9 skipped by user)*
-- **Demo Video walkthrough**: `https://youtube.com/watch?v=demo-placeholder` *(Placeholder)*
+- **Frontend**: Run locally — `cd frontend && npm run dev`
+- **Backend API**: Run locally — `cd backend && python -m uvicorn main:app --reload`
+- **Demo Video walkthrough**: *(Placeholder)*
 
 ---
 
@@ -42,7 +41,7 @@ The following diagram illustrates the components and data flows of the CareerPil
 | **Vector DB** | Pinecone | Core similarity index for CV embeddings |
 | **Database** | Supabase (PostgreSQL) / SQLite | Relational database with SQLAlchemy ORM |
 | **LLM & Embeddings** | OpenAI (GPT-4o-mini, text-embedding-3-small) / Gemini | RAG text embedding and reasons generation |
-| **Hosting** | Vercel (Frontend), Railway (Backend) | Production environment hosting |
+| **Hosting** | Self-hosted (Vercel/Railway/Render optional) | Production environment hosting |
 
 ---
 

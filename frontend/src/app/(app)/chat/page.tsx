@@ -6,18 +6,14 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-
-interface Msg {
-  role: "user" | "assistant";
-  content: string;
-  sources?: string[];
-}
+import { useAppStore } from "@/store/useAppStore";
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messages = useAppStore((s) => s.chatMessages);
+  const addChatMessage = useAppStore((s) => s.addChatMessage);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -28,22 +24,16 @@ export default function ChatPage() {
     const text = input.trim();
     if (!text || loading) return;
 
-    const userMsg: Msg = { role: "user", content: text };
-    setMessages((prev) => [...prev, userMsg]);
+    const userMsg = { role: "user" as const, content: text };
+    addChatMessage(userMsg);
     setInput("");
     setLoading(true);
 
     try {
       const res = await sendChatMessage(text);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: res.answer, sources: res.sources },
-      ]);
+      addChatMessage({ role: "assistant", content: res.answer, sources: res.sources });
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Sorry, I couldn't process that. Please try again." },
-      ]);
+      addChatMessage({ role: "assistant", content: "Sorry, I couldn't process that. Please try again." });
     }
     setLoading(false);
   }
@@ -113,8 +103,9 @@ export default function ChatPage() {
                     ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
                     li: ({ children }) => <li>{children}</li>,
                     strong: ({ children }) => <strong className="font-semibold text-blue-400">{children}</strong>,
-                    code: ({ inline, className, children }) => {
-                      if (inline) {
+                    code: ({ className, children, ...props }) => {
+                      const isInline = !className?.includes('language-');
+                      if (isInline) {
                         return <code className="bg-black/20 px-1 py-0.5 rounded text-xs font-mono">{children}</code>;
                       }
                       return <code className="block bg-black/20 p-2 rounded text-xs font-mono overflow-x-auto">{children}</code>;

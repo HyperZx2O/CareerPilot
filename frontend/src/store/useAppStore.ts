@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { devtools } from "zustand/middleware";
+import { devtools, persist } from "zustand/middleware";
 import type { Job, Application, Todo, Goal, DashboardStats } from "@/types";
 
 interface AppState {
@@ -40,44 +40,60 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>()(
-  devtools((set) => ({
-    userId: null,
-    cvId: null,
-    setUser: (userId) => set({ userId }),
-    setCvId: (cvId) => set({ cvId }),
+  devtools(
+    persist(
+      (set) => ({
+        userId: null,
+        cvId: null,
+        setUser: (userId) => set({ userId }),
+        setCvId: (cvId) => set({ cvId }),
 
-    jobs: [],
-    jobsLoading: false,
-    setJobs: (jobs) => set({ jobs }),
-    setJobsLoading: (jobsLoading) => set({ jobsLoading }),
+        jobs: [],
+        jobsLoading: false,
+        setJobs: (jobs) => set({ jobs }),
+        setJobsLoading: (jobsLoading) => set({ jobsLoading }),
 
-    applications: [],
-    setApplications: (applications) => set({ applications }),
-    moveApplication: (id, status) =>
-      set((s) => ({
-        applications: s.applications.map((a) =>
-          a.id === id ? { ...a, status } : a
-        ),
-      })),
+        applications: [],
+        setApplications: (applications) => set({ applications }),
+        moveApplication: (id, status) =>
+          set((s) => ({
+            applications: s.applications.map((a) =>
+              a.id === id ? { ...a, status } : a
+            ),
+          })),
 
-    todos: [],
-    setTodos: (todos) => set({ todos }),
-    toggleTodo: (id) =>
-      set((s) => ({
-        todos: s.todos.map((t) =>
-          t.id === id ? { ...t, done: !t.done } : t
-        ),
-      })),
+        todos: [],
+        setTodos: (todos) => set({ todos }),
+        toggleTodo: (id) =>
+          set((s) => ({
+            todos: s.todos.map((t) =>
+              t.id === id ? { ...t, done: !t.done } : t
+            ),
+          })),
 
-    goals: [],
-    setGoals: (goals) => set({ goals }),
+        goals: [],
+        setGoals: (goals) => set({ goals }),
 
-    stats: null,
-    setStats: (stats) => set({ stats }),
+        stats: null,
+        setStats: (stats) => set({ stats }),
 
-    chatMessages: [],
-    addChatMessage: (msg) =>
-      set((s) => ({ chatMessages: [...s.chatMessages, msg] })),
-    clearChat: () => set({ chatMessages: [] }),
-  }))
+        chatMessages: [],
+        addChatMessage: (msg) =>
+          set((s) => ({ chatMessages: [...s.chatMessages, msg] })),
+        clearChat: () => set({ chatMessages: [] }),
+      }),
+      {
+        name: "careerpilot-storage",
+        partialize: (state) => ({
+          // Persist these fields across reloads
+          cvId: state.cvId,
+          userId: state.userId,
+          applications: state.applications,
+          todos: state.todos,
+          goals: state.goals,
+          stats: state.stats,
+        }),
+      }
+    )
+  )
 );

@@ -9,8 +9,8 @@
 | Environment | URL |
 |-------------|-----|
 | Local       | `http://localhost:8000` |
-| Staging     | `https://staging.railway.app` |
-| Production  | `https://api.careerpilot.app` |
+| Staging     | *(self-hosted)* |
+| Production  | *(self-hosted)* |
 
 ## Authentication
 

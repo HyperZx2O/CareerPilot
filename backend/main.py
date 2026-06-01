@@ -26,6 +26,11 @@ try:
 except ImportError:
     jobs_router = None  # integrations deps (openai, pinecone…) not installed
 
+try:
+    from backend.routers.roadmap import router as roadmap_router
+except ImportError:
+    roadmap_router = None
+
 app = FastAPI(
     title="CareerPilot Backend API",
     description="FastAPI Backend for CareerPilot Job Hunting and RAG Platform",
@@ -49,6 +54,8 @@ from backend.routers.settings import router as settings_router
 # Include Routers
 if jobs_router is not None:
     app.include_router(jobs_router)
+if roadmap_router is not None:
+    app.include_router(roadmap_router)
 app.include_router(tracker_router)
 app.include_router(cv_router)
 app.include_router(chat_router)

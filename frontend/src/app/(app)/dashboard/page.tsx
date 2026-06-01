@@ -24,10 +24,10 @@ function StatCard({ label, value, sub, icon }: { label: string; value: string | 
 }
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [nudge, setNudge] = useState<NudgeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const cvId = useAppStore((s) => s.cvId);
+  const stats = useAppStore((s) => s.stats);
 
   useEffect(() => {
     async function load() {
@@ -36,17 +36,11 @@ export default function DashboardPage() {
           getDashboardStats(DEMO_USER_ID, cvId || undefined),
           getNudge(DEMO_USER_ID, cvId || undefined),
         ]);
-        setStats(s);
+        useAppStore.getState().setStats(s);
         setNudge(n);
       } catch {
-        // Gracefully handle API unavailability in dev
-        setStats({
-          applications_this_week: 5,
-          applications_last_week: 3,
-          skills_count: 14,
-          roadmap_progress: 62,
-          streak_days: 7,
-        });
+        // Use persisted stats from localStorage if API fails
+        // If no stats available, leave as null (will show empty state)
       }
       setLoading(false);
     }
@@ -62,8 +56,9 @@ export default function DashboardPage() {
     );
   }
 
-  const s = stats!;
-  const weekDiff = s.applications_this_week - s.applications_last_week;
+  // Use persisted stats from localStorage, or show empty state
+  const s = stats;
+  const weekDiff = s ? s.applications_this_week - s.applications_last_week : 0;
   const weekTrend = weekDiff >= 0 ? `↑ ${weekDiff} from last week` : `↓ ${Math.abs(weekDiff)} from last week`;
 
   return (
@@ -89,22 +84,22 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Stat cards */}
+      {/* Stat cards - show empty state if no data */}
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4 mb-8">
-        <StatCard label="Applications This Week" value={s.applications_this_week} sub={weekTrend} icon="📨" />
-        <StatCard label="Skills Detected" value={s.skills_count} icon="🧠" />
-        <StatCard label="Streak" value={`${s.streak_days} days`} icon="🔥" />
-        <StatCard label="Roadmap Progress" value={`${s.roadmap_progress}%`} icon="🗺️" />
+        <StatCard label="Applications This Week" value={s?.applications_this_week ?? "—"} sub={s ? weekTrend : "No data yet"} icon="📨" />
+        <StatCard label="Skills Detected" value={s?.skills_count ?? "—"} icon="🧠" />
+        <StatCard label="Streak" value={s ? `${s.streak_days} days` : "—"} icon="🔥" />
+        <StatCard label="Roadmap Progress" value={s ? `${s.roadmap_progress}%` : "—"} icon="🗺️" />
       </div>
 
       {/* Roadmap progress bar */}
       <div className="cp-card mb-8">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold">Learning Roadmap</h3>
-          <span className="text-sm" style={{ color: "var(--cp-text-muted)" }}>{s.roadmap_progress}%</span>
+          <span className="text-sm" style={{ color: "var(--cp-text-muted)" }}>{s?.roadmap_progress ?? 0}%</span>
         </div>
         <div className="cp-progress">
-          <div className="cp-progress-bar" style={{ width: `${s.roadmap_progress}%` }} />
+          <div className="cp-progress-bar" style={{ width: `${s?.roadmap_progress ?? 0}%` }} />
         </div>
       </div>
 
