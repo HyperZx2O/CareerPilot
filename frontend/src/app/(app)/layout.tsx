@@ -2,6 +2,8 @@ import Sidebar from "@/components/ui/Sidebar";
 import Providers from "../providers";
 import ThemeProvider from "@/components/providers/ThemeProvider";
 
+export const dynamic = "force-dynamic";
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <Providers>
