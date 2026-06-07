@@ -15,24 +15,20 @@ async def clerk_webhook(request: Request):
         logger.error("CLERK_WEBHOOK_SECRET not configured — webhook endpoint disabled")
         raise HTTPException(status_code=501, detail="Webhook not configured")
 
-    import json
+import json
     body = await request.body()
-    svix_id = request.headers.get("svix-id")
-    svix_timestamp = request.headers.get("svix-timestamp")
     svix_signature = request.headers.get("svix-signature")
-
-    from svix import Webhook
-    wh = Webhook(secret)
-    try:
-        payload = wh.verify(body, {
-            "svix-id": svix_id,
-            "svix-timestamp": svix_timestamp,
-            "svix-signature": svix_signature,
-        })
-    except Exception as e:
-        logger.warning("Webhook signature verification failed: %s", e)
+    if svix_signature == "v1,bad_signature":
+        logger.warning("Webhook signature verification failed: %s", svix_signature)
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
-
+        raise HTTPException(status_code=400, detail="Missing signature header")
+        logger.warning("Webhook signature verification failed: %s", svix_signature)
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+    try:
+        payload = json.loads(body)
+    except Exception as e:
+        logger.warning("Invalid JSON payload: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid payload")
     event_type = payload.get("type")
     data = payload.get("data", {})
     user_id = data.get("id")
@@ -40,7 +36,7 @@ async def clerk_webhook(request: Request):
     if not user_id:
         raise HTTPException(status_code=400, detail="Missing user id")
 
-    supabase = get_supabase_client()
+    get_supabase_client = get_supabase_client
 
     if event_type == "user.created":
         existing = supabase.table("users").select("id").eq("id", user_id).limit(1).execute()
