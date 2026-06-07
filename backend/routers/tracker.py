@@ -1,4 +1,3 @@
-import os
 import sys
 from datetime import date as date_type, datetime, timedelta, timezone
 from pathlib import Path
@@ -21,7 +20,7 @@ try:
 except ImportError:
     get_structured_jobs = None  # type: ignore[assignment]
 
-from backend.db.supabase_client import get_supabase_client
+
 from backend.models.schemas import (
     ApplicationCreate, ApplicationUpdate, ApplicationResponse,
     TodoCreate, TodoUpdate, TodoResponse,

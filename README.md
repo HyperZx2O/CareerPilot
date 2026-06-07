@@ -26,12 +26,12 @@ cp .env.example .env   # Fill in your API keys
 # 2. Backend
 cd backend
 pip install -r requirements.txt
-uvicorn main:app --reload      # → http://localhost:8000/docs
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 # 3. Frontend
 cd ../frontend
 npm install
-npm run dev                    # → http://localhost:3000
+npm run dev
 ```
 
 ---
@@ -59,8 +59,7 @@ cd frontend && npx tsc --noEmit
 | **Vector DB** | Pinecone | CV chunk similarity search |
 | **LLM** | Groq (Llama 3.3 70B) / NVIDIA NIM | Goal gen, roadmap, RAG chat, cover letters |
 | **Job APIs** | JSearch (primary) + Adzuna (fallback) | Live job listings |
-| **Queue** | Redis + Celery | Background CV parsing, nudge scheduling |
-| **Monitoring** | Prometheus + Grafana | Metrics & dashboards |
+| **Queue** | Redis | Rate limiter backend |
 
 ---
 
@@ -100,7 +99,7 @@ backend/
 │   ├── cover_letter.py  # AI cover letter generation
 │   └── nudge.py         # Inactivity detection
 ├── db/                  # Database clients & schema
-└── workers/             # Celery tasks (CV parsing, nudge)
+└── workers/             # Background CV parsing
 frontend/
 └── src/
     ├── app/             # Next.js pages & routes

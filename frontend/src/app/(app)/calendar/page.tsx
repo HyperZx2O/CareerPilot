@@ -99,6 +99,7 @@ export default function CalendarPage() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [newTodo, setNewTodo] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
   const [newGoal, setNewGoal] = useState("");
@@ -109,10 +110,7 @@ export default function CalendarPage() {
         const [t, g] = await Promise.all([getTodos(DEMO_USER_ID), getGoals(DEMO_USER_ID)]);
         setTodos(t);
         setGoals(g);
-      } catch {
-        setTodos([]);
-        setGoals([]);
-      }
+      } catch { setError("Failed to load calendar"); }
       setLoading(false);
     }
     load();
@@ -133,12 +131,10 @@ export default function CalendarPage() {
     try {
       const todo = await createTodo({ user_id: DEMO_USER_ID, title: newTodo, due_date: newDueDate || undefined });
       setTodos((prev) => [todo, ...prev]);
-    } catch {
-      setTodos((prev) => [
-        { id: Date.now().toString(), user_id: DEMO_USER_ID, goal_id: null, title: newTodo, due_date: newDueDate || null, done: false, created_at: new Date().toISOString() },
-        ...prev,
-      ]);
-    }
+    } catch { setError("Failed to add todo"); setTodos((prev) => [
+      { id: Date.now().toString(), user_id: DEMO_USER_ID, goal_id: null, title: newTodo, due_date: newDueDate || null, done: false, created_at: new Date().toISOString() },
+      ...prev,
+    ]); }
     setNewTodo("");
     setNewDueDate("");
   }
@@ -147,12 +143,12 @@ export default function CalendarPage() {
     const todo = todos.find((t) => t.id === id);
     if (!todo) return;
     setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
-    try { await updateTodo(id, { done: !todo.done }); } catch {}
+    try { await updateTodo(id, { done: !todo.done }); } catch { setError("Failed to update todo"); }
   }
 
   async function handleDeleteTodo(id: string) {
     setTodos((prev) => prev.filter((t) => t.id !== id));
-    try { await deleteTodo(id); } catch {}
+    try { await deleteTodo(id); } catch { setError("Failed to delete todo"); }
   }
 
   async function handleAddGoal(e: React.FormEvent) {
@@ -161,12 +157,10 @@ export default function CalendarPage() {
     try {
       const goal = await createGoal({ user_id: DEMO_USER_ID, title: newGoal });
       setGoals((prev) => [goal, ...prev]);
-    } catch {
-      setGoals((prev) => [
-        { id: Date.now().toString(), user_id: DEMO_USER_ID, title: newGoal, target_date: null, progress: 0, created_at: new Date().toISOString() },
-        ...prev,
-      ]);
-    }
+    } catch { setError("Failed to add goal"); setGoals((prev) => [
+      { id: Date.now().toString(), user_id: DEMO_USER_ID, title: newGoal, target_date: null, progress: 0, created_at: new Date().toISOString() },
+      ...prev,
+    ]); }
     setNewGoal("");
   }
 
@@ -193,6 +187,29 @@ export default function CalendarPage() {
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
         />
+      </motion.div>
+    );
+  }
+
+  if (error) {
+    return (
+      <motion.div
+        className="mb-4 flex items-center gap-2 rounded-xl border p-3 text-sm animate-fade-in"
+        style={{
+          borderColor: "var(--cp-danger)",
+          background: "rgba(239, 68, 68, 0.1)",
+          color: "var(--cp-danger)",
+        }}
+      >
+        {error}
+        <motion.button
+          onClick={() => setError(null)}
+          className="ml-auto p-1"
+          whileHover={{ scale: 1.2 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          ✕
+        </motion.button>
       </motion.div>
     );
   }

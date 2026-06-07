@@ -4,9 +4,9 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { chatSend } from "@/lib/api";
+import { sendChatMessage } from "@/lib/api";
 import type { ChatMessage } from "@/types";
-import { Send, Bot, User, Loader2, Sparkles, RefreshCw } from "lucide-react";
+import { Send, Bot, User, RefreshCw } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -186,7 +186,7 @@ export default function ChatPage() {
     setInput("");
     setLoading(true);
     try {
-      const { answer, sources } = await chatSend(trimmed);
+      const { answer, sources } = await sendChatMessage(trimmed);
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: answer, sources },

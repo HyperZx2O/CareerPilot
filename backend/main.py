@@ -12,13 +12,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
-def _is_placeholder(val: str) -> bool:
-    if not val:
-        return True
-    return val.startswith("your_") or val == "your-key-here"
+from backend.utils import is_placeholder
 
 sentry_dsn = os.getenv("SENTRY_DSN", "")
-if sentry_dsn and not _is_placeholder(sentry_dsn):
+if sentry_dsn and not is_placeholder(sentry_dsn):
     import sentry_sdk
     sentry_sdk.init(
         dsn=sentry_dsn,
@@ -34,15 +31,7 @@ for _p in (str(_project_root), str(_integrations_path)):
 
 
 from backend.middleware.rate_limit import RateLimitMiddleware
-from starlette.responses import Response
 
-try:
-    from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
-    REQUESTS = Counter("careerpilot_requests_total", "Total HTTP requests", ["method", "endpoint", "status"])
-    DURATION = Histogram("careerpilot_request_duration_seconds", "Request duration", ["method", "endpoint"])
-    _PROMETHEUS_ENABLED = True
-except ImportError:
-    _PROMETHEUS_ENABLED = False
 from backend.routers.tracker import router as tracker_router
 from backend.routers.cv import router as cv_router
 from backend.routers.chat import router as chat_router
@@ -50,7 +39,7 @@ from backend.routers.chat import router as chat_router
 try:
     from backend.routers.jobs import router as jobs_router
 except ImportError:
-    jobs_router = None  # integrations deps (openai, pinecone…) not installed
+    jobs_router = None  # integrations deps not installed
 
 try:
     from backend.routers.roadmap import router as roadmap_router
@@ -96,7 +85,7 @@ async def _check_pinecone():
     try:
         from pinecone import Pinecone
         api_key = os.getenv("PINECONE_API_KEY", "")
-        if not api_key or _is_placeholder(api_key):
+        if not api_key or is_placeholder(api_key):
             return None
         pc = Pinecone(api_key=api_key)
         pc.list_indexes()
@@ -108,7 +97,7 @@ async def _check_groq():
     try:
         from groq import Groq
         key = os.getenv("GROQ_API_KEY", "")
-        if not key or _is_placeholder(key):
+        if not key or is_placeholder(key):
             return None
         client = Groq(api_key=key)
         client.models.list()
@@ -133,7 +122,6 @@ async def health_check():
         "checks": checks,
     }
 
-from backend.auth import get_current_user
 from starlette.middleware.base import BaseHTTPMiddleware
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -165,32 +153,6 @@ class RequestBodySizeMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(RequestBodySizeMiddleware)
-
-@app.get("/metrics", tags=["system"])
-async def metrics(user=Depends(get_current_user)):
-    if not _PROMETHEUS_ENABLED:
-        return Response("prometheus_client not installed", status_code=501)
-    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
-
-
-# Prometheus middleware
-if _PROMETHEUS_ENABLED:
-    import time
-    from starlette.middleware.base import BaseHTTPMiddleware
-
-    class MetricsMiddleware(BaseHTTPMiddleware):
-        async def dispatch(self, request, call_next):
-            start = time.time()
-            response = await call_next(request)
-            sanitized_path = "/".join(seg if seg.isdigit() else seg for seg in request.url.path.strip("/").split("/"))
-            DURATION.labels(method=request.method, endpoint="/" + sanitized_path).observe(time.time() - start)
-            REQUESTS.labels(
-                method=request.method, endpoint="/" + sanitized_path, status=response.status_code
-            ).inc()
-            return response
-
-    app.add_middleware(MetricsMiddleware)
-
 
 from backend.routers.webhooks import router as webhooks_router
 from backend.routers.settings import router as settings_router

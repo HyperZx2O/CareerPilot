@@ -125,6 +125,7 @@ function ApplicationFunnel({ applications }: { applications: Application[] }) {
 export default function TrackerPage() {
   const [view, setView] = useState<"roadmap" | "kanban">("roadmap");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formTitle, setFormTitle] = useState("");
   const [formCompany, setFormCompany] = useState("");
@@ -156,7 +157,7 @@ export default function TrackerPage() {
       if (goalsData.length > 0 && !selectedGoalId) {
         setSelectedGoalId(goalsData[0].id);
       }
-    } catch { /* Use persisted data from localStorage if API fails */ }
+    } catch { setError("Failed to load data"); }
     setLoading(false);
   }
 
@@ -168,7 +169,7 @@ export default function TrackerPage() {
       const result = await generateGoals(getUserId(), cvId ?? undefined);
       setGoals(result.goals);
       if (result.goals.length > 0) setSelectedGoalId(result.goals[0].id);
-    } catch { /* silent fail */ }
+    } catch { setError("Failed to generate goals"); }
     setGeneratingGoals(false);
   }
 
@@ -185,7 +186,7 @@ export default function TrackerPage() {
       });
       setGoals([goal, ...useAppStore.getState().goals]);
       setSelectedGoalId(goal.id);
-    } catch { /* silent fail */ }
+    } catch { setError("Failed to create goal"); }
     setGoalFormTitle(""); setGoalFormDesc(""); setGoalFormRole("");
     setShowGoalModal(false);
   }
@@ -197,7 +198,7 @@ export default function TrackerPage() {
     try {
       const { deleteGoal } = await import("@/lib/api");
       await deleteGoal(id);
-    } catch {}
+    } catch { setError("Failed to delete goal"); }
   }
 
   async function handleGenerateRoadmap() {
@@ -214,14 +215,14 @@ export default function TrackerPage() {
         target_role: goal.target_role || goal.title,
       });
       setTodos([...useAppStore.getState().todos, ...result.todos]);
-    } catch { /* silent fail */ }
+    } catch { setError("Failed to generate roadmap"); }
     setGenerating(false);
   }
 
   async function handleToggleTodo(todo: Todo) {
     const newDone = !todo.done;
     setTodos(useAppStore.getState().todos.map((t) => (t.id === todo.id ? { ...t, done: newDone } : t)));
-    try { await updateTodo(todo.id, { done: newDone }); } catch {}
+    try { await updateTodo(todo.id, { done: newDone }); } catch { setError("Failed to update todo"); }
   }
 
   async function handleAdd(e: React.FormEvent) {
@@ -234,34 +235,31 @@ export default function TrackerPage() {
         company: formCompany,
       });
       setApplications([app, ...useAppStore.getState().applications]);
-    } catch {
-      const newApp: Application = {
-        id: Date.now().toString(),
-        user_id: getUserId(),
-        job_title: formTitle,
-        company: formCompany,
-        location: null,
-        deadline: null,
-        status: "applied",
-        notes: null,
-        job_id: null,
-        fit_score: null,
-        applied_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setApplications([...useAppStore.getState().applications, newApp]);
-    }
+    } catch { setError("Failed to add application"); const newApp: Application = {
+      id: Date.now().toString(),
+      user_id: getUserId(),
+      job_title: formTitle,
+      company: formCompany,
+      location: null,
+      deadline: null,
+      status: "applied",
+      notes: null,
+      job_id: null,
+      fit_score: null,
+      applied_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }; setApplications([...useAppStore.getState().applications, newApp]); }
     setFormTitle(""); setFormCompany(""); setShowForm(false);
   }
 
   async function handleMove(id: string, newStatus: ApplicationStatus) {
     setApplications(useAppStore.getState().applications.map((a) => a.id === id ? { ...a, status: newStatus } : a));
-    try { await updateApplication(id, { status: newStatus }); } catch {}
+    try { await updateApplication(id, { status: newStatus }); } catch { setError("Failed to update application"); }
   }
 
   async function handleDelete(id: string) {
     setApplications(useAppStore.getState().applications.filter((a) => a.id !== id));
-    try { await deleteApplication(id); } catch {}
+    try { await deleteApplication(id); } catch { setError("Failed to delete application"); }
   }
 
   const roadmapTodos = useMemo(() => {
@@ -299,6 +297,29 @@ export default function TrackerPage() {
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
         />
+      </motion.div>
+    );
+  }
+
+  if (error) {
+    return (
+      <motion.div
+        className="mb-4 flex items-center gap-2 rounded-xl border p-3 text-sm animate-fade-in"
+        style={{
+          borderColor: "var(--cp-danger)",
+          background: "rgba(239, 68, 68, 0.1)",
+          color: "var(--cp-danger)",
+        }}
+      >
+        {error}
+        <motion.button
+          onClick={() => setError(null)}
+          className="ml-auto p-1"
+          whileHover={{ scale: 1.2 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          ✕
+        </motion.button>
       </motion.div>
     );
   }

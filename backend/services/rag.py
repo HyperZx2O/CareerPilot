@@ -3,13 +3,9 @@ from typing import List
 from backend.db.supabase_client import get_supabase_client
 from integrations.fit_score import embed_text
 from backend.logger import get_logger
+from backend.utils import is_placeholder
 
 logger = get_logger("rag")
-
-def _is_placeholder(val: str) -> bool:
-    if not val:
-        return True
-    return val.startswith("your_") or val == "your-key-here"
 
 
 def get_user_context_data(user_id: str) -> dict:
@@ -94,7 +90,7 @@ def retrieve_relevant_chunks(query: str, cv_id: str = None, top_k: int = 3) -> L
     pinecone_key = os.getenv("PINECONE_API_KEY")
     groq_key = os.getenv("GROQ_API_KEY")
     nvidia_key = os.getenv("NVIDIA_API_KEY")
-    use_pinecone = pinecone_key and (groq_key or nvidia_key) and not _is_placeholder(pinecone_key)
+    use_pinecone = pinecone_key and (groq_key or nvidia_key) and not is_placeholder(pinecone_key)
 
     if use_pinecone:
         try:
@@ -118,11 +114,10 @@ def retrieve_relevant_chunks(query: str, cv_id: str = None, top_k: int = 3) -> L
 
     # Fetch from Supabase cv_chunks table
     try:
+        query_builder = supabase.table("cv_chunks").select("section_type,chunk_text")
         if cv_id:
-            result = supabase.table("cv_chunks").select("section_type,chunk_text").eq("cv_id", cv_id).order("chunk_index").limit(top_k).execute()
-        else:
-            # Get most recent CV chunks for this user (lookup user by cv_id's user_id)
-            result = supabase.table("cv_chunks").select("section_type,chunk_text").eq("cv_id", cv_id).order("chunk_index").limit(top_k).execute()
+            query_builder = query_builder.eq("cv_id", cv_id)
+        result = query_builder.order("chunk_index").limit(top_k).execute()
 
         for chunk in result.data:
             chunks.append({
@@ -188,7 +183,7 @@ def generate_answer(query: str, chunks: List[dict], user_id: str = None) -> str:
     )
 
     # Try Groq (fastest free option)
-    if groq_key and not _is_placeholder(groq_key):
+    if groq_key and not is_placeholder(groq_key):
         try:
             from groq import Groq
             client = Groq(api_key=groq_key)
@@ -203,10 +198,10 @@ def generate_answer(query: str, chunks: List[dict], user_id: str = None) -> str:
         except Exception as e:
             logger.warning("Groq call failed: %s", e)
 
-    if nvidia_key and not _is_placeholder(nvidia_key):
+    if nvidia_key and not is_placeholder(nvidia_key):
         logger.warning("NVIDIA NIM configured but no runtime integration available in this build")
 
-    # Gemini removed from runtime integrations.
+
 
     logger.info("Using local template fallback (no LLM API keys configured)")
     q = query.lower()

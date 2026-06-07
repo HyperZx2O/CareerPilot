@@ -2,21 +2,16 @@ import json
 import os
 from backend.prompts.goals import GOAL_GENERATION_PROMPT, GOAL_TITLE_MAX, GOAL_DESC_MAX
 from backend.logger import get_logger
+from backend.utils import is_placeholder
 
 logger = get_logger("goals")
-
-
-def _is_placeholder(val: str) -> bool:
-    if not val:
-        return True
-    return val.startswith("your_") or val == "your-key-here"
 
 
 def _call_llm(prompt: str) -> str:
     groq_key = os.getenv("GROQ_API_KEY")
     nvidia_key = os.getenv("NVIDIA_API_KEY")
 
-    if groq_key and not _is_placeholder(groq_key):
+    if groq_key and not is_placeholder(groq_key):
         try:
             from groq import Groq
             client = Groq(api_key=groq_key)
@@ -30,7 +25,7 @@ def _call_llm(prompt: str) -> str:
         except Exception as e:
             logger.warning("Groq call failed: %s", e)
 
-    if nvidia_key and not _is_placeholder(nvidia_key):
+    if nvidia_key and not is_placeholder(nvidia_key):
         import urllib.request
         req = urllib.request.Request(
             "https://integrate.api.nvidia.com/v1/chat/completions",

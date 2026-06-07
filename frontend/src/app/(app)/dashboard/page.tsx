@@ -229,6 +229,7 @@ function QuickActionCard({
 export default function DashboardPage() {
   const [nudge, setNudge] = useState<NudgeResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const cvId = useAppStore((s) => s.cvId);
   const stats = useAppStore((s) => s.stats);
 
@@ -242,9 +243,7 @@ export default function DashboardPage() {
         ]);
         useAppStore.getState().setStats(s);
         setNudge(n);
-      } catch {
-        // Use persisted stats from localStorage if API fails
-      }
+      } catch { setError("Failed to load dashboard"); }
       setLoading(false);
     }
     load();
@@ -260,6 +259,29 @@ export default function DashboardPage() {
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
         />
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <motion.div
+        className="mb-4 flex items-center gap-2 rounded-xl border p-3 text-sm animate-fade-in"
+        style={{
+          borderColor: "var(--cp-danger)",
+          background: "rgba(239, 68, 68, 0.1)",
+          color: "var(--cp-danger)",
+        }}
+      >
+        {error}
+        <motion.button
+          onClick={() => setError(null)}
+          className="ml-auto p-1"
+          whileHover={{ scale: 1.2 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          ✕
+        </motion.button>
+      </motion.div>
     );
   }
 

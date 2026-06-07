@@ -1,6 +1,3 @@
-import os
-import sys
-from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from backend.db.supabase_client import get_supabase_client
 from backend.auth import get_current_user, get_supabase_user_client

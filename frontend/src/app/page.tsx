@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
-import { ArrowRight, Zap, FileText, MessageSquare, BarChart3, Target } from "lucide-react";
+import { ArrowRight, Search, FileText, MessageSquare, BarChart3, Target } from "lucide-react";
 
 const PILLARS = [
   {
-    icon: SearchIcon,
+    icon: Search,
     title: "Job Hunter Agent",
     desc: "Live job search with real-time fit scores powered by cosine similarity against your CV.",
     color: "#6366f1",
@@ -39,26 +39,6 @@ const PILLARS = [
     borderColor: "rgba(34, 197, 94, 0.3)",
   },
 ];
-
-function SearchIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.3-4.3" />
-    </svg>
-  );
-}
 
 function AnimatedPillarCard({
   pillar,

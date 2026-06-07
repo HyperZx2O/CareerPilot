@@ -25,7 +25,6 @@ export interface CVChunk {
   cv_id: string;
   section: "experience" | "education" | "skills" | "projects" | "summary" | "other";
   content: string;
-  chroma_vector_id: string;
   created_at: string;
 }
 

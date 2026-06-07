@@ -8,7 +8,7 @@ sys.path.append(str(root_path))
 from fastapi import APIRouter, status
 from pydantic import BaseModel
 from backend.db.supabase_client import get_supabase_client
-from backend.models.schemas import TodoCreate, TodoResponse
+from backend.models.schemas import TodoResponse
 from backend.services.roadmap import generate_roadmap
 from backend.logger import get_logger
 

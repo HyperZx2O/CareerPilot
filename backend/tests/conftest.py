@@ -26,11 +26,6 @@ for p in (str(_PROJECT_ROOT), str(_BACKEND_DIR)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-# Make `from tests._fake_supabase import ...` work in both in-tree and
-# installed modes without needing package markers.
-if str(_BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(_BACKEND_DIR))
-
 from tests._fake_supabase import (  # noqa: E402
     FakeSupabaseClient,
     FakeResponse,
@@ -54,6 +49,7 @@ _POLLUTED_MODULE_NAMES = (
     "requests",
     "dotenv",
     "pinecone",
+    "groq",
     # Note: OpenAI and Google generativeai removed from project; do not include here
 )
 

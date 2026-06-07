@@ -55,9 +55,7 @@ export default function ProfilePage() {
       if (data.sections && data.sections.length > 0) {
         setCvSections(data.sections);
       }
-    } catch {
-      // Silently handle fetch failure
-    }
+    } catch { setError("Failed to fetch CV sections"); }
     setLoadingSections(false);
   }
 
@@ -96,10 +94,31 @@ export default function ProfilePage() {
         setCvSections(data.sections);
         return;
       }
-    } catch {
-      // Silently handle polling failure
-    }
+    } catch { setError("Failed to fetch CV sections"); }
     setTimeout(() => pollForSections(id, attempts + 1), 1000);
+  }
+
+  if (error) {
+    return (
+      <motion.div
+        className="mb-4 flex items-center gap-2 rounded-xl border p-3 text-sm animate-fade-in"
+        style={{
+          borderColor: "var(--cp-danger)",
+          background: "rgba(239, 68, 68, 0.1)",
+          color: "var(--cp-danger)",
+        }}
+      >
+        {error}
+        <motion.button
+          onClick={() => setError(null)}
+          className="ml-auto p-1"
+          whileHover={{ scale: 1.2 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          ✕
+        </motion.button>
+      </motion.div>
+    );
   }
 
   return (

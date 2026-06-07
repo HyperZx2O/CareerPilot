@@ -2,10 +2,10 @@ import os
 import re
 import asyncio
 import tempfile
-from .celery_app import celery
 from backend.db.supabase_client import get_supabase_client
 from integrations.fit_score import embed_text
 from backend.logger import get_logger
+from backend.utils import is_placeholder
 
 logger = get_logger("cv_worker")
 
@@ -125,16 +125,11 @@ def _parse_and_index_cv_sync(cv_id: str, tmp_path: str = None):
     segments = segment_cv_text(text)
     
     # 4. Embed & Index into Pinecone (if credentials are set)
-    def _is_placeholder(val: str) -> bool:
-        if not val:
-            return True
-        return val.startswith("your_") or val == "your-key-here"
-
     pinecone_key = os.getenv("PINECONE_API_KEY")
     groq_key = os.getenv("GROQ_API_KEY")
     nvidia_key = os.getenv("NVIDIA_API_KEY")
 
-    use_pinecone = pinecone_key and (groq_key or nvidia_key) and not _is_placeholder(pinecone_key)
+    use_pinecone = pinecone_key and (groq_key or nvidia_key) and not is_placeholder(pinecone_key)
     if use_pinecone:
         try:
             from pinecone import Pinecone

@@ -107,7 +107,7 @@ Nudge check → GET /api/tracker/nudge
 |-------|------------|-------------|
 | `users` | `id` (UUID) | `email`, `clerk_id`, `full_name` |
 | `cvs` | `id` (UUID) | `user_id`, `file_name`, `file_type`, `processing_status`, `sections_found` (JSON) |
-| `cv_chunks` | `id` (UUID) | `cv_id`, `section`, `content`, `chroma_vector_id` |
+| `cv_chunks` | `id` (UUID) | `cv_id`, `section`, `content` |
 | `applications` | `id` (UUID) | `user_id`, `job_title`, `company`, `status` (enum), `fit_score`, `applied_at` |
 | `todos` | `id` (UUID) | `user_id`, `goal_id` (FK nullable), `title`, `due_date`, `done` |
 | `goals` | `id` (UUID) | `user_id`, `title`, `target_date`, `progress` (0-100) |
