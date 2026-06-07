@@ -129,7 +129,7 @@ export default function CalendarPage() {
     e.preventDefault();
     if (!newTodo.trim()) return;
     try {
-      const todo = await createTodo({ user_id: DEMO_USER_ID, title: newTodo, due_date: newDueDate || undefined });
+      const todo = await createTodo({ user_id: DEMO_USER_ID, title: newTodo, due_date: newDueDate || null });
       setTodos((prev) => [todo, ...prev]);
     } catch { setError("Failed to add todo"); setTodos((prev) => [
       { id: Date.now().toString(), user_id: DEMO_USER_ID, goal_id: null, title: newTodo, due_date: newDueDate || null, done: false, created_at: new Date().toISOString() },

@@ -228,16 +228,11 @@ export default function TrackerPage() {
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!formTitle.trim() || !formCompany.trim()) return;
-    try {
-      const app = await createApplication({
-        user_id: getUserId(),
-        job_title: formTitle,
-        company: formCompany,
-      });
-      setApplications([app, ...useAppStore.getState().applications]);
-    } catch { setError("Failed to add application"); const newApp: Application = {
+    const uid = getUserId();
+    const now = new Date().toISOString();
+    const newApp: Application = {
       id: Date.now().toString(),
-      user_id: getUserId(),
+      user_id: uid,
       job_title: formTitle,
       company: formCompany,
       location: null,
@@ -246,10 +241,21 @@ export default function TrackerPage() {
       notes: null,
       job_id: null,
       fit_score: null,
-      applied_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }; setApplications([...useAppStore.getState().applications, newApp]); }
-    setFormTitle(""); setFormCompany(""); setShowForm(false);
+      applied_at: now,
+      updated_at: now,
+    };
+    setApplications([newApp, ...useAppStore.getState().applications]);
+    try {
+      const app = await createApplication(newApp);
+      if (app && app.id) {
+        setApplications([app, ...useAppStore.getState().applications.filter((a) => a.id !== newApp.id)]);
+      }
+    } catch {
+      setError("Failed to add application");
+    }
+    setFormTitle("");
+    setFormCompany("");
+    setShowForm(false);
   }
 
   async function handleMove(id: string, newStatus: ApplicationStatus) {

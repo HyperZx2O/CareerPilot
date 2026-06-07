@@ -1,5 +1,9 @@
+import json
 import os
-from fastapi import APIRouter, Request, HTTPException
+
+from fastapi import APIRouter, HTTPException, Request
+from svix import Webhook
+
 from backend.db.supabase_client import get_supabase_client
 from backend.logger import get_logger
 
@@ -15,20 +19,31 @@ async def clerk_webhook(request: Request):
         logger.error("CLERK_WEBHOOK_SECRET not configured — webhook endpoint disabled")
         raise HTTPException(status_code=501, detail="Webhook not configured")
 
-import json
     body = await request.body()
+    svix_id = request.headers.get("svix-id")
+    svix_timestamp = request.headers.get("svix-timestamp")
     svix_signature = request.headers.get("svix-signature")
-    if svix_signature == "v1,bad_signature":
-        logger.warning("Webhook signature verification failed: %s", svix_signature)
-        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+    if not svix_id or not svix_timestamp or not svix_signature:
         raise HTTPException(status_code=400, detail="Missing signature header")
-        logger.warning("Webhook signature verification failed: %s", svix_signature)
+
+    try:
+        wh = Webhook(secret)
+        wh.verify(body.decode("utf-8"), {
+            "svix-id": svix_id,
+            "svix-timestamp": svix_timestamp,
+            "svix-signature": svix_signature,
+        })
+    except Exception as e:
+        logger.warning("Webhook signature verification failed: %s", e)
         raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
     try:
         payload = json.loads(body)
     except Exception as e:
         logger.warning("Invalid JSON payload: %s", e)
         raise HTTPException(status_code=400, detail="Invalid payload")
+
     event_type = payload.get("type")
     data = payload.get("data", {})
     user_id = data.get("id")
@@ -36,7 +51,7 @@ import json
     if not user_id:
         raise HTTPException(status_code=400, detail="Missing user id")
 
-    get_supabase_client = get_supabase_client
+    supabase = get_supabase_client()
 
     if event_type == "user.created":
         existing = supabase.table("users").select("id").eq("id", user_id).limit(1).execute()
