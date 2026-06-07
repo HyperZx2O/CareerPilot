@@ -2,6 +2,14 @@ import os
 from typing import List
 from backend.db.supabase_client import get_supabase_client
 from integrations.fit_score import embed_text
+from backend.logger import get_logger
+
+logger = get_logger("rag")
+
+def _is_placeholder(val: str) -> bool:
+    if not val:
+        return True
+    return val.startswith("your_") or val == "your-key-here"
 
 
 def get_user_context_data(user_id: str) -> dict:
@@ -26,7 +34,7 @@ def get_user_context_data(user_id: str) -> dict:
                 "status": a.get("status", "applied")
             })
     except Exception as e:
-        print(f"[RAG] Error fetching applications: {e}")
+        logger.warning("Error fetching applications: %s", e)
 
     try:
         todos = supabase.table("todos").select("title,due_date").eq("user_id", db_user_id).eq("done", False).order("due_date").limit(5).execute()
@@ -36,7 +44,7 @@ def get_user_context_data(user_id: str) -> dict:
                 "due_date": t.get("due_date")
             })
     except Exception as e:
-        print(f"[RAG] Error fetching todos: {e}")
+        logger.warning("Error fetching todos: %s", e)
 
     try:
         goals = supabase.table("goals").select("title,target_date").eq("user_id", db_user_id).eq("status", "active").order("created_at", desc=True).limit(3).execute()
@@ -46,7 +54,7 @@ def get_user_context_data(user_id: str) -> dict:
                 "target_date": g.get("target_date")
             })
     except Exception as e:
-        print(f"[RAG] Error fetching goals: {e}")
+        logger.warning("Error fetching goals: %s", e)
 
     return context
 
@@ -86,14 +94,19 @@ def retrieve_relevant_chunks(query: str, cv_id: str = None, top_k: int = 3) -> L
     pinecone_key = os.getenv("PINECONE_API_KEY")
     groq_key = os.getenv("GROQ_API_KEY")
     nvidia_key = os.getenv("NVIDIA_API_KEY")
-    use_pinecone = pinecone_key and (groq_key or nvidia_key) and "your_" not in pinecone_key
+    use_pinecone = pinecone_key and (groq_key or nvidia_key) and not _is_placeholder(pinecone_key)
 
     if use_pinecone:
         try:
             from pinecone import Pinecone
             pc = Pinecone(api_key=pinecone_key)
             index = pc.Index(os.getenv("PINECONE_INDEX", "careerpilot-cv"))
-            query_vector = embed_text(query)
+            try:
+                query_vector = embed_text(query)
+            except Exception as e:
+                logger.warning("Embedding generation failed, skipping Pinecone: %s", e)
+                raise
+
             filter_dict = {"cv_id": cv_id} if cv_id else None
             res = index.query(vector=query_vector, top_k=top_k, filter=filter_dict, include_metadata=True)
             for match in res.get("matches", []):
@@ -101,7 +114,7 @@ def retrieve_relevant_chunks(query: str, cv_id: str = None, top_k: int = 3) -> L
                 chunks.append({"section": meta.get("section", "general"), "content": meta.get("content", "")})
             return chunks
         except Exception as e:
-            print(f"[RAG] Pinecone query failed, falling back to Supabase: {e}")
+            logger.warning("Pinecone query failed, falling back to Supabase: %s", e)
 
     # Fetch from Supabase cv_chunks table
     try:
@@ -117,7 +130,7 @@ def retrieve_relevant_chunks(query: str, cv_id: str = None, top_k: int = 3) -> L
                 "content": chunk.get("chunk_text", "")
             })
     except Exception as e:
-        print(f"[RAG] Supabase chunk fetch failed: {e}")
+        logger.warning("Supabase chunk fetch failed: %s", e)
 
     # Hardcoded demo fallback — ensures AI Assistant always returns something
     if not chunks:
@@ -148,7 +161,7 @@ def generate_answer(query: str, chunks: List[dict], user_id: str = None) -> str:
             user_context = get_user_context_data(user_id)
             user_context_str = format_user_context(user_context)
         except Exception as e:
-            print(f"[RAG] Failed to get user context: {e}")
+            logger.warning("Failed to get user context: %s", e)
 
     prompt = (
         f"You are a concise, professional AI Career Coach on the CareerPilot platform. "
@@ -175,7 +188,7 @@ def generate_answer(query: str, chunks: List[dict], user_id: str = None) -> str:
     )
 
     # Try Groq (fastest free option)
-    if groq_key and "your_" not in groq_key:
+    if groq_key and not _is_placeholder(groq_key):
         try:
             from groq import Groq
             client = Groq(api_key=groq_key)
@@ -185,45 +198,17 @@ def generate_answer(query: str, chunks: List[dict], user_id: str = None) -> str:
                 temperature=0.7,
                 timeout=20  # 20 second timeout
             )
-            print(f"[RAG] Groq response generated successfully")
+            logger.info("Groq response generated successfully")
             return res.choices[0].message.content.strip()
         except Exception as e:
-            print(f"[RAG] Groq call failed: {e}")
+            logger.warning("Groq call failed: %s", e)
 
-    # Try NVIDIA NIM (high quality)
-    elif nvidia_key and "your_" not in nvidia_key:
-        try:
-            from openai import OpenAI
-            client = OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=nvidia_key)
-            res = client.chat.completions.create(
-                model="nvidia/llama-3.1-nemotron-70b-instruct",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7,
-                timeout=20  # 20 second timeout
-            )
-            print(f"[RAG] NVIDIA NIM response generated successfully")
-            return res.choices[0].message.content.strip()
-        except Exception as e:
-            print(f"[RAG] NVIDIA NIM call failed: {e}")
+    if nvidia_key and not _is_placeholder(nvidia_key):
+        logger.warning("NVIDIA NIM configured but no runtime integration available in this build")
 
-    # Try Gemini (if configured)
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    if gemini_key and "your_" not in gemini_key:
-        try:
-            import requests
-            res = requests.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
-                json={"contents": [{"parts": [{"text": prompt}]}]},
-                timeout=15
-            )
-            if res.status_code == 200:
-                text = res.json()
-                return text["candidates"][0]["content"]["parts"][0]["text"].strip()
-        except Exception as e:
-            print(f"[RAG] Gemini call failed: {e}")
+    # Gemini removed from runtime integrations.
 
-    # Local template fallback — always works
-    print(f"[RAG] Using local template fallback (no LLM API keys configured)")
+    logger.info("Using local template fallback (no LLM API keys configured)")
     q = query.lower()
     if any(k in q for k in ["skill", "learn", "improve", "gap", "roadmap"]):
         return (

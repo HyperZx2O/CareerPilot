@@ -8,24 +8,14 @@ root_path = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(root_path))
 sys.path.append(str(root_path / "integrations"))
 
-# Mock out external third-party dependencies before importing FastAPI application
-mock_requests = MagicMock()
-sys.modules['requests'] = mock_requests
-
+# Mock out external third-party dependencies before importing FastAPI
+# application.  We deliberately do NOT mock `requests` here — the real
+# library is installed and `pyiceberg` (a transitive dep of `supabase`)
+# needs the genuine `requests.auth` module at import time.
 mock_dotenv = MagicMock()
 sys.modules['dotenv'] = mock_dotenv
-
-mock_openai = MagicMock()
-sys.modules['openai'] = mock_openai
-
 mock_pinecone = MagicMock()
 sys.modules['pinecone'] = mock_pinecone
-
-# Correctly mock google.generativeai namespace
-mock_google = MagicMock()
-sys.modules['google'] = mock_google
-mock_genai = mock_google.generativeai
-sys.modules['google.generativeai'] = mock_genai
 
 # Import testing tools and the application under test
 import unittest
@@ -55,7 +45,13 @@ class TestJobsRouter(unittest.TestCase):
         """Test the system health check endpoint."""
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"status": "ok", "environment": "development"})
+        data = response.json()
+        self.assertIn("status", data)
+        self.assertIn("environment", data)
+        self.assertIn("checks", data)
+        self.assertIn("supabase", data["checks"])
+        self.assertIn("pinecone", data["checks"])
+        self.assertIn("groq", data["checks"])
 
     def test_search_jobs_without_cv_id(self):
         """Test search endpoint returns jobs with fit_score null when cv_id is omitted."""

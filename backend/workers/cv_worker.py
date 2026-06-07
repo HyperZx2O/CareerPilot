@@ -5,6 +5,9 @@ import tempfile
 from .celery_app import celery
 from backend.db.supabase_client import get_supabase_client
 from integrations.fit_score import embed_text
+from backend.logger import get_logger
+
+logger = get_logger("cv_worker")
 
 def extract_text_from_pdf(pdf_path: str) -> str:
     """Extracts all text page-by-page from a PDF file using pypdf."""
@@ -18,7 +21,7 @@ def extract_text_from_pdf(pdf_path: str) -> str:
                 text += page_text + "\n"
         return text
     except Exception as e:
-        print(f"Error reading PDF with pypdf: {e}")
+        logger.warning("Error reading PDF with pypdf: %s", e)
         return ""
 
 def segment_cv_text(text: str) -> dict[str, str]:
@@ -84,7 +87,7 @@ def _parse_and_index_cv_sync(cv_id: str, tmp_path: str = None):
     # 1. Fetch CV from database
     cv_result = supabase.table("cvs").select("*").eq("id", cv_id).execute()
     if not cv_result.data:
-        print(f"[CV Worker] CV with ID {cv_id} not found.")
+        logger.warning("CV with ID %s not found", cv_id)
         return
     
     cv_record = cv_result.data[0]
@@ -92,16 +95,17 @@ def _parse_and_index_cv_sync(cv_id: str, tmp_path: str = None):
     # 2. Extract Text - use tmp_path if provided, otherwise try to find local file
     if tmp_path and os.path.exists(tmp_path):
         text = extract_text_from_pdf(tmp_path)
-        print(f"[CV Worker] Extracted {len(text)} chars from provided path: {tmp_path}")
+        logger.info("Extracted %d chars from provided path: %s", len(text), tmp_path)
     else:
-        # Fallback: try local tempfile path
-        local_path = os.path.join(tempfile.gettempdir(), cv_record["file_name"])
+        # Fallback: try local tempfile path (sanitized)
+        safe_filename = os.path.basename(cv_record.get("file_name", ""))
+        local_path = os.path.join(tempfile.gettempdir(), safe_filename)
         if os.path.exists(local_path):
             text = extract_text_from_pdf(local_path)
-            print(f"[CV Worker] Extracted {len(text)} chars from local path: {local_path}")
+            logger.info("Extracted %d chars from local path: %s", len(text), local_path)
         else:
             text = ""
-            print(f"[CV Worker] Could not find CV file at {tmp_path} or {local_path}")
+            logger.warning("Could not find CV file at %s or %s", tmp_path, local_path)
             supabase.table("cvs").update({"processing_status": "failed"}).eq("id", cv_id).execute()
             return
     
@@ -121,11 +125,16 @@ def _parse_and_index_cv_sync(cv_id: str, tmp_path: str = None):
     segments = segment_cv_text(text)
     
     # 4. Embed & Index into Pinecone (if credentials are set)
+    def _is_placeholder(val: str) -> bool:
+        if not val:
+            return True
+        return val.startswith("your_") or val == "your-key-here"
+
     pinecone_key = os.getenv("PINECONE_API_KEY")
     groq_key = os.getenv("GROQ_API_KEY")
     nvidia_key = os.getenv("NVIDIA_API_KEY")
 
-    use_pinecone = pinecone_key and (groq_key or nvidia_key) and "your_" not in pinecone_key
+    use_pinecone = pinecone_key and (groq_key or nvidia_key) and not _is_placeholder(pinecone_key)
     if use_pinecone:
         try:
             from pinecone import Pinecone
@@ -133,7 +142,7 @@ def _parse_and_index_cv_sync(cv_id: str, tmp_path: str = None):
             index_name = os.getenv("PINECONE_INDEX", "careerpilot-cv")
             index = pc.Index(index_name)
         except Exception as e:
-            print(f"[CV Worker] Failed to initialize Pinecone: {e}")
+            logger.warning("Failed to initialize Pinecone: %s", e)
             use_pinecone = False
     
     sections_found = []
@@ -168,7 +177,7 @@ def _parse_and_index_cv_sync(cv_id: str, tmp_path: str = None):
                     )]
                 )
             except (ValueError, Exception) as ve:
-                print(f"[CV Worker] Error upserting segment '{sec_name}' to Pinecone: {ve}. Chunk saved locally only.")
+                logger.warning("Error upserting segment '%s' to Pinecone: %s. Chunk saved locally only.", sec_name, ve)
     
     # 5. Batch insert all chunks to Supabase
     if chunks_to_insert:
@@ -180,7 +189,7 @@ def _parse_and_index_cv_sync(cv_id: str, tmp_path: str = None):
         "processing_status": "completed"
     }).eq("id", cv_id).execute()
     
-    print(f"[CV Worker] Successfully processed and indexed CV '{cv_id}' (Sections: {sections_found}).")
+    logger.info("Successfully processed and indexed CV '%s' (Sections: %s)", cv_id, sections_found)
 
     # 7. Generate AI career goals from CV skills
     try:
@@ -205,6 +214,6 @@ def _parse_and_index_cv_sync(cv_id: str, tmp_path: str = None):
                     except Exception:
                         pass  # source column may not exist yet
                     supabase.table("goals").insert(insert_data).execute()
-                print(f"[CV Worker] Generated {len(goals)} career goals for user {user_id}")
+                logger.info("Generated %d career goals for user %s", len(goals), user_id)
     except Exception as e:
-        print(f"[CV Worker] Goal generation failed: {e}")
+        logger.warning("Goal generation failed: %s", e)

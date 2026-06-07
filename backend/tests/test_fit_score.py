@@ -21,9 +21,6 @@ sys.modules['groq'] = mock_groq
 mock_pinecone = MagicMock()
 sys.modules['pinecone'] = mock_pinecone
 
-mock_requests = MagicMock()
-sys.modules['requests'] = mock_requests
-
 # Import functions under test
 from integrations.fit_score import cosine_similarity, compute_fit_score
 

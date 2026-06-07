@@ -2,47 +2,79 @@ name: CI
 
 on:
   push:
-    branches: [dev, main]
+    branches: [main, develop]
   pull_request:
-    branches: [dev, main]
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.11"
 
 jobs:
-  lint-test:
+  backend-tests:
     runs-on: ubuntu-latest
-    env:
-      # ── Production-critical env vars wired from GitHub Secrets ──
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
-      PINECONE_INDEX: ${{ secrets.PINECONE_INDEX || 'careerpilot-cv' }}
-      CLERK_AUDIENCE: ${{ secrets.CLERK_AUDIENCE }}
-      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
-      ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - name: Install backend deps
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt', 'integrations/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
         run: |
-          cd backend
-          pip install -r requirements.txt
-      - name: Run backend tests
-        run: |
-          cd backend
-          pytest -q
-      - name: Set up Node.js
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r ../integrations/requirements.txt groq svix sentry-sdk
+
+      - name: Run tests
+        run: python -m pytest . -v --tb=short
+        env:
+          ENV: test
+          JSEARCH_API_KEY: test-key
+          SUPABASE_URL: http://localhost
+          SUPABASE_ANON_KEY: test-key
+          PINECONE_API_KEY: ""
+          GROQ_API_KEY: ""
+          REDIS_URL: redis://localhost:6379/0
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - name: Install frontend deps
-        run: |
-          cd frontend
-          npm ci
-      - name: Run frontend lint
-        run: |
-          cd frontend
-          npm run lint
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build

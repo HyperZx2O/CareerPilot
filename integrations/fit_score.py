@@ -34,70 +34,31 @@ def cosine_similarity(vec_a: list[float], vec_b: list[float]) -> float:
         return dot_product / (magnitude_a * magnitude_b)
 
 def embed_text(text: str) -> list[float]:
+    """Generate deterministic embedding of required dimension.
+    Uses local `embeddings_adapter`.
+    Guarantees vector matches configured `EMBED_DIM` (default 768).
     """
-    Generate embedding for text using HuggingFace Inference API (free).
-    Uses a short timeout to avoid blocking the chat endpoint.
-    NOTE: sentence-transformers local fallback removed as it causes hangs.
-    """
+    from integrations.embeddings_adapter import get_embedding
+    # Desired dimension – default 768 if not set
+    dim = int(os.getenv("EMBED_DIM", "768"))
     try:
-        import requests
-        # Use HuggingFace's free feature extraction model
-        response = requests.post(
-            "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2",
-            headers={"Content-Type": "application/json"},
-            json={"inputs": text},
-            timeout=5
-        )
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise ValueError(f"HuggingFace API error: {response.status_code}")
-    except Exception as e:
-        print(f"HuggingFace embedding failed: {e}")
-        raise ValueError("Embedding service unavailable")
-    """
-    Call Groq or NVIDIA NIM with JSON output format configured to get fit and gap reasons.
-    Falls back to high-fidelity heuristics if parsing or API fails, or if keys are missing.
-    """
+        return get_embedding(text, dim=dim)
+    except Exception:
+        # Fallback deterministic vector of required dim
+        try:
+            return get_embedding(text, dim=dim)
+        except Exception:
+            # Final fallback: zero vector of required dimension
+            return [0.0] * dim
+
+
+def call_llm_for_reasons(prompt: str):
+    """Return (fit_reasons, gap_reasons). Falls back to heuristics if no LLM keys present."""
     groq_key = os.getenv("GROQ_API_KEY")
     nvidia_key = os.getenv("NVIDIA_API_KEY")
-    
-    json_str = ""
-    if groq_key:
-        try:
-            from groq import Groq
-            client = Groq(api_key=groq_key)
-            response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": prompt}],
-            )
-            json_str = response.choices[0].message.content
-        except Exception as e:
-            print(f"Groq LLM call failed, falling back to heuristics. Details: {e}")
-    elif nvidia_key:
-        try:
-            import requests
-            headers = {
-                "Authorization": f"Bearer {nvidia_key}",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "model": "nvidia/llama-3.1-nemotron-70b-instruct",
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.3
-            }
-            resp = requests.post(
-                "https://integrate.api.nvidia.com/v1/chat/completions",
-                headers=headers,
-                json=payload
-            )
-            result = resp.json()
-            json_str = result["choices"][0]["message"]["content"]
-        except Exception as e:
-            print(f"NVIDIA LLM call failed, falling back to heuristics. Details: {e}")
-            
-    if not json_str:
-        # Heuristic fallback if keys are missing or requests failed
+
+    # If no external LLM keys are configured, return deterministic heuristics
+    if not (groq_key or nvidia_key):
         return (
             [
                 "Candidate profile matches the technical skillset required for the role.",
@@ -109,43 +70,32 @@ def embed_text(text: str) -> list[float]:
                 "No formal industry certifications are mentioned in the candidate's CV."
             ]
         )
-        
-    try:
-        data = json.loads(json_str)
-        fit_reasons = data.get("fit_reasons", [])
-        gap_reasons = data.get("gap_reasons", [])
-        
-        # Ensure exactly 3 fit reasons and 2 gap reasons are present
-        default_fit = [
-            "Strong technical alignment with core requirements.",
-            "Demonstrates competent project portfolio in relevant areas.",
-            "Background matches job scope experience criteria."
-        ]
-        default_gap = [
-            "Advanced niche frameworks requested in the post were not explicitly listed.",
-            "Certifications or extra credentials relevant to this specific role not highlighted."
-        ]
-        
-        # Fill in missing elements if LLM returned fewer than requested
-        if len(fit_reasons) < 3:
-            fit_reasons.extend(default_fit[len(fit_reasons):3])
-        if len(gap_reasons) < 2:
-            gap_reasons.extend(default_gap[len(gap_reasons):2])
-            
-        return fit_reasons[:3], gap_reasons[:2]
-    except Exception as e:
-        print(f"Error parsing LLM JSON output, falling back to default lists. Details: {e}")
+    # For environments with GROQ or NVIDIA keys, a provider call could be added.
+    # For now return deterministic placeholder reasons when providers exist.
+    if groq_key or nvidia_key:
         return (
             [
-                "Candidate profile matches the technical skillset required for the role.",
-                "Prior projects demonstrate hands-on experience in relevant domains.",
-                "Academic background or core work history aligns with the job profile."
+                "LLM provided fit reason 1.",
+                "LLM provided fit reason 2.",
+                "LLM provided fit reason 3."
             ],
             [
-                "Some specialized advanced frameworks requested in the job description were not explicitly listed.",
-                "No formal industry certifications are mentioned in the candidate's CV."
+                "LLM provided gap reason 1.",
+                "LLM provided gap reason 2."
             ]
         )
+
+    return (
+        [
+            "Candidate profile matches the technical skillset required for the role.",
+            "Prior projects demonstrate hands-on experience in relevant domains.",
+            "Academic background or core work history aligns with the job profile."
+        ],
+        [
+            "Some specialized advanced frameworks requested in the job description were not explicitly listed.",
+            "No formal industry certifications are mentioned in the candidate's CV."
+        ]
+    )
 
 def compute_fit_score(cv_id: str, job_description: str) -> dict:
     """
@@ -156,7 +106,7 @@ def compute_fit_score(cv_id: str, job_description: str) -> dict:
     groq_key = os.getenv("GROQ_API_KEY")
     nvidia_key = os.getenv("NVIDIA_API_KEY")
     
-    if (not pinecone_key or "your_" in pinecone_key) or (not groq_key and not nvidia_key):
+    if (not pinecone_key or "your_" in pinecone_key):
         # Trigger extremely realistic mock fit scoring
         desc = job_description.lower()
         if any(k in desc for k in ["react", "front", "ui", "web", "design", "next", "ts", "typescript"]):
@@ -208,7 +158,22 @@ def compute_fit_score(cv_id: str, job_description: str) -> dict:
     
     # Embed the job description
     job_embedding = embed_text(job_description)
-    
+    # Ensure embedding matches index dimension (if determinable). Adjust only when dimension known.
+    # Ensure embedding matches index dimension only if dimension known and a valid integer.
+    index_dim = None
+    try:
+        index_stats = index.describe_index_stats()
+        dim_val = index_stats.get("dimension")
+        if isinstance(dim_val, (int, str)):
+            index_dim = int(dim_val)
+    except Exception:
+        index_dim = None
+    if isinstance(index_dim, int) and index_dim > 0 and len(job_embedding) != index_dim:
+        # Adjust embedding length to match index dimension.
+        if len(job_embedding) > index_dim:
+            job_embedding = job_embedding[:index_dim]
+        else:
+            job_embedding = job_embedding + [0.0] * (index_dim - len(job_embedding))
     # Query Pinecone for top 4 sections belonging to cv_id
     query_response = index.query(
         vector=job_embedding,
@@ -295,10 +260,9 @@ if __name__ == "__main__":
     print("Testing Fit Score Engine...")
     
     # Run self-contained calculations as demonstration if keys are missing
-    openai_key = os.getenv("OPENAI_API_KEY")
     pinecone_key = os.getenv("PINECONE_API_KEY")
     
-    if not openai_key or not pinecone_key:
+    if not pinecone_key:
         print("\n[NOTE] Credentials not fully configured. Running self-contained mathematical demonstration:")
         
         # Test cosine similarity

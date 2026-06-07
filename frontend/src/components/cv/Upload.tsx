@@ -13,7 +13,7 @@ export default function UploadCV() {
     setStatus('Uploading...');
     try {
       const result = await uploadCV(file);
-      setCvId(result.id); // Store cvId in localStorage
+      setCvId(result.cv_id); // Store cvId in localStorage
       setStatus('Uploaded');
     } catch (err) {
       setStatus('Error');

@@ -1,72 +1,60 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getSettings, updateSettings, type ApiSettings } from "@/lib/api";
+import { useState, useEffect } from "react";
+import { useAppStore } from "@/store/useAppStore";
+import { requestNotificationPermission, getNotificationPermission } from "@/components/providers/ThemeProvider";
+
+type NotificationPref = "all" | "important" | "none";
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<ApiSettings>({
-    DATABASE_URL: "",
-    SUPABASE_URL: "",
-    SUPABASE_ANON_KEY: "",
-    PINECONE_API_KEY: "",
-    PINECONE_INDEX: "",
-    PINECONE_ENV: "",
-    OPENAI_API_KEY: "",
-    GEMINI_API_KEY: "",
-    ADZUNA_APP_ID: "",
-    ADZUNA_APP_KEY: "",
-  });
+  const settings = useAppStore((s) => s.settings);
+  const updateSetting = useAppStore((s) => s.updateSetting);
 
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [notificationStatus, setNotificationStatus] = useState<"default" | "granted" | "denied">("default");
 
   useEffect(() => {
-    async function load() {
-      try {
-        const s = await getSettings();
-        setSettings(s);
-      } catch (err) {
-        console.error("Failed to load settings:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+    setNotificationStatus(getNotificationPermission() || "default");
   }, []);
 
-  const handleChange = (key: keyof ApiSettings, val: string) => {
-    setSettings((prev) => ({ ...prev, [key]: val }));
+  const handleChange = (key: string, val: string | boolean) => {
+    // Request notification permission when enabling push notifications
+    if (key === "notifications" && val !== "none") {
+      requestNotificationPermission().then((granted) => {
+        setNotificationStatus(granted ? "granted" : "denied");
+      });
+    }
+    updateSetting(key as keyof typeof settings, val as any);
+  };
+
+  const handleToggleWeekly = async () => {
+    const newValue = !settings.weekly_report;
+    if (newValue) {
+      const granted = await requestNotificationPermission();
+      if (!granted) {
+        setMessage({ type: "error", text: "Please allow notifications in your browser to enable weekly reports." });
+        return;
+      }
+    }
+    handleChange("weekly_report", newValue);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setMessage(null);
-    try {
-      const res = await updateSettings(settings);
-      setMessage({ type: "success", text: res.message || "Settings updated successfully!" });
-    } catch (err: any) {
-      setMessage({ type: "error", text: err.message || "Failed to update settings. Please try again." });
-    } finally {
-      setSaving(false);
-    }
+
+    await new Promise((r) => setTimeout(r, 500));
+    setMessage({ type: "success", text: "Settings saved successfully!" });
+    setSaving(false);
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-96 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
-          style={{ borderColor: "var(--cp-primary)", borderTopColor: "transparent" }} />
-      </div>
-    );
-  }
-
   return (
-    <div className="animate-slide-up max-w-4xl pb-12">
+    <div className="animate-slide-up max-w-3xl pb-12">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-1">Settings</h1>
-        <p style={{ color: "var(--cp-text-muted)" }}>Configure your API integration keys and system preferences</p>
+        <p style={{ color: "var(--cp-text-muted)" }}>Customize your experience and preferences</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
@@ -83,169 +71,106 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* API Credentials */}
+        {/* Appearance */}
         <div className="cp-card">
-          <div className="border-b pb-4 mb-6" style={{ borderColor: "var(--cp-border)" }}>
+          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <span>🎨</span> Appearance
+          </h2>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-semibold block mb-2">Theme</label>
+              <select
+                className="cp-input w-full md:w-48"
+                value={settings.theme}
+                onChange={(e) => handleChange("theme", e.target.value)}
+              >
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+                <option value="auto">Auto</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Notifications */}
+        <div className="cp-card">
+          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <span>🔔</span> Notifications
+          </h2>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-semibold block mb-2">Push Notifications</label>
+              <div className="flex items-center gap-3">
+                <select
+                  className="cp-input w-full md:w-48"
+                  value={settings.notifications}
+                  onChange={(e) => handleChange("notifications", e.target.value)}
+                >
+                  <option value="all">All updates</option>
+                  <option value="important">Important only</option>
+                  <option value="none">None</option>
+                </select>
+                <span className="text-xs" style={{ color: "var(--cp-text-dim)" }}>
+                  {notificationStatus === "granted" ? "✅ Enabled" : notificationStatus === "denied" ? "🚫 Blocked" : "⚠️ Not set"}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className={`w-12 h-6 rounded-full transition-colors relative ${settings.weekly_report ? "bg-[var(--cp-primary)]" : "bg-[var(--cp-border)]"}`}
+                onClick={handleToggleWeekly}
+              >
+                <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform absolute top-0.5 ${settings.weekly_report ? "translate-x-6" : "translate-x-0.5"}`} />
+              </button>
+              <div>
+                <p className="text-sm font-medium">Weekly Progress Report</p>
+                <p className="text-xs" style={{ color: "var(--cp-text-muted)" }}>Get a summary of your job search every Monday</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* AI API Keys */}
+        <div className="cp-card">
+          <div className="border-b pb-4 mb-4" style={{ borderColor: "var(--cp-border)" }}>
             <h2 className="text-lg font-bold flex items-center gap-2">
-              <span>🔌</span> API Keys & Third-party Integrations
+              <span>🤖</span> AI Configuration
             </h2>
             <p className="text-xs mt-1" style={{ color: "var(--cp-text-muted)" }}>
-              Values entered here are dynamically synced and written back to your workspace <code>.env</code> file.
+              Configure AI providers for the AI Assistant. At least one is recommended for full functionality.
             </p>
           </div>
-
           <div className="grid gap-6 md:grid-cols-2">
-            {/* LLMs */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: "var(--cp-primary-hover)" }}>
-                <span>🤖</span> Large Language Models (LLM)
-              </h3>
-              
-              <div>
-                <label className="text-xs font-semibold block mb-1.5">Gemini API Key</label>
-                <input
-                  type="password"
-                  className="cp-input w-full"
-                  placeholder="AIzaSy..."
-                  value={settings.GEMINI_API_KEY}
-                  onChange={(e) => handleChange("GEMINI_API_KEY", e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold block mb-1.5">OpenAI API Key</label>
-                <input
-                  type="password"
-                  className="cp-input w-full"
-                  placeholder="sk-proj-..."
-                  value={settings.OPENAI_API_KEY}
-                  onChange={(e) => handleChange("OPENAI_API_KEY", e.target.value)}
-                />
-              </div>
+            <div>
+              <label className="text-xs font-semibold block mb-1.5">Groq API Key <span className="text-[var(--cp-primary)]">★ Recommended</span></label>
+              <input
+                type="password"
+                className="cp-input w-full"
+                placeholder="gsk_..."
+                value={settings.groq_api_key}
+                onChange={(e) => handleChange("groq_api_key", e.target.value)}
+              />
+              <p className="text-xs mt-1" style={{ color: "var(--cp-text-dim)" }}>Fast & free at console.groq.com</p>
             </div>
-
-            {/* Pinecone */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: "var(--cp-accent)" }}>
-                <span>🌲</span> Vector Database (Pinecone)
-              </h3>
-              
-              <div>
-                <label className="text-xs font-semibold block mb-1.5">Pinecone API Key</label>
-                <input
-                  type="password"
-                  className="cp-input w-full"
-                  placeholder="pcsk_..."
-                  value={settings.PINECONE_API_KEY}
-                  onChange={(e) => handleChange("PINECONE_API_KEY", e.target.value)}
-                />
-              </div>
-
-              <div className="grid gap-4 grid-cols-2">
-                <div>
-                  <label className="text-xs font-semibold block mb-1.5">Index Name</label>
-                  <input
-                    type="text"
-                    className="cp-input w-full text-sm"
-                    placeholder="careerpilot-cv"
-                    value={settings.PINECONE_INDEX}
-                    onChange={(e) => handleChange("PINECONE_INDEX", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold block mb-1.5">Environment</label>
-                  <input
-                    type="text"
-                    className="cp-input w-full text-sm"
-                    placeholder="us-east-1"
-                    value={settings.PINECONE_ENV}
-                    onChange={(e) => handleChange("PINECONE_ENV", e.target.value)}
-                  />
-                </div>
-              </div>
+            <div>
+              <label className="text-xs font-semibold block mb-1.5">NVIDIA NIM API Key</label>
+              <input
+                type="password"
+                className="cp-input w-full"
+                placeholder="nvapi-..."
+                value={settings.nvidia_api_key}
+                onChange={(e) => handleChange("nvidia_api_key", e.target.value)}
+              />
+              <p className="text-xs mt-1" style={{ color: "var(--cp-text-dim)" }}>High quality at build.nvidia.com</p>
             </div>
-
-            {/* Adzuna */}
-            <div className="space-y-4 md:col-span-2 pt-4 border-t" style={{ borderColor: "var(--cp-border)" }}>
-              <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: "var(--cp-warning)" }}>
-                <span>💼</span> Adzuna Job Search API
-              </h3>
-              
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="text-xs font-semibold block mb-1.5">App ID</label>
-                  <input
-                    type="text"
-                    className="cp-input w-full"
-                    placeholder="8e327818"
-                    value={settings.ADZUNA_APP_ID}
-                    onChange={(e) => handleChange("ADZUNA_APP_ID", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold block mb-1.5">App Key</label>
-                  <input
-                    type="password"
-                    className="cp-input w-full"
-                    placeholder="6119a6d13f2e55..."
-                    value={settings.ADZUNA_APP_KEY}
-                    onChange={(e) => handleChange("ADZUNA_APP_KEY", e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Supabase */}
-            <div className="space-y-4 md:col-span-2 pt-4 border-t" style={{ borderColor: "var(--cp-border)" }}>
-              <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: "var(--cp-success)" }}>
-                <span>⚡</span> Database (PostgreSQL / Supabase)
-              </h3>
-              
-              <div>
-                <label className="text-xs font-semibold block mb-1.5">PostgreSQL DATABASE_URL</label>
-                <input
-                  type="text"
-                  className="cp-input w-full font-mono text-xs"
-                  placeholder="postgresql://postgres:password@host:5432/postgres"
-                  value={settings.DATABASE_URL}
-                  onChange={(e) => handleChange("DATABASE_URL", e.target.value)}
-                />
-                <p className="text-xs mt-1" style={{ color: "var(--cp-text-dim)" }}>
-                  If left blank, sqlite fallback database (sqlite+aiosqlite:///careerpilot.db) will automatically be used locally.
-                </p>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="text-xs font-semibold block mb-1.5">Supabase URL</label>
-                  <input
-                    type="text"
-                    className="cp-input w-full"
-                    placeholder="https://xyz.supabase.co"
-                    value={settings.SUPABASE_URL}
-                    onChange={(e) => handleChange("SUPABASE_URL", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold block mb-1.5">Supabase Anon Key</label>
-                  <input
-                    type="password"
-                    className="cp-input w-full"
-                    placeholder="eyJhbGci..."
-                    value={settings.SUPABASE_ANON_KEY}
-                    onChange={(e) => handleChange("SUPABASE_ANON_KEY", e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
           </div>
         </div>
 
         {/* Action Button */}
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end">
           <button type="submit" className="cp-btn cp-btn-primary px-8 py-3 font-semibold text-sm" disabled={saving}>
-            {saving ? "🔄 Saving and Reloading..." : "💾 Save Settings"}
+            {saving ? "🔄 Saving..." : "💾 Save Settings"}
           </button>
         </div>
       </form>

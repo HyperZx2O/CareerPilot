@@ -10,6 +10,9 @@ from pydantic import BaseModel
 from backend.db.supabase_client import get_supabase_client
 from backend.models.schemas import TodoCreate, TodoResponse
 from backend.services.roadmap import generate_roadmap
+from backend.logger import get_logger
+
+logger = get_logger("roadmap")
 
 router = APIRouter(prefix="/api/roadmap", tags=["Roadmap"])
 
@@ -51,12 +54,12 @@ async def generate_roadmap_endpoint(payload: RoadmapRequest):
     try:
         todos_text = generate_roadmap(payload.target_role, skills_text)
     except Exception as e:
-        print(f"[Roadmap] generation failed: {e}")
+        logger.warning("generation failed: %s", e)
         todos_text = []
 
     # Create todo rows in Supabase
     inserted = []
-    for i, title in enumerate(todos_text):
+    for i, step in enumerate(todos_text):
         # Due date: week i+1 from today
         due_date = None
         try:
@@ -67,7 +70,7 @@ async def generate_roadmap_endpoint(payload: RoadmapRequest):
 
         todo_payload = {
             "user_id": payload.user_id,
-            "title": title,
+            "title": step["title"],
             "goal_id": payload.goal_id,
             "due_date": due_date,
         }
@@ -87,4 +90,5 @@ async def generate_roadmap_endpoint(payload: RoadmapRequest):
     return {
         "message": f"Generated {len(inserted)} roadmap steps",
         "todos": inserted,
+        "steps": todos_text,
     }

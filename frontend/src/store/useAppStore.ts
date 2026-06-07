@@ -2,12 +2,27 @@ import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import type { Job, Application, Todo, Goal, DashboardStats } from "@/types";
 
+interface UserSettings {
+  notifications: "all" | "important" | "none";
+  weekly_report: boolean;
+  theme: "light" | "dark" | "auto";
+  groq_api_key: string;
+  nvidia_api_key: string;
+}
+
 interface AppState {
   // User
   userId: string | null;
+  authToken: string | null;
   cvId: string | null;
   setUser: (userId: string) => void;
+  setAuthToken: (token: string | null) => void;
   setCvId: (cvId: string) => void;
+
+  // Settings
+  settings: UserSettings;
+  setSettings: (settings: UserSettings) => void;
+  updateSetting: <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => void;
 
   // Jobs
   jobs: Job[];
@@ -44,9 +59,22 @@ export const useAppStore = create<AppState>()(
     persist(
       (set) => ({
         userId: null,
+        authToken: null,
         cvId: null,
         setUser: (userId) => set({ userId }),
+        setAuthToken: (authToken) => set({ authToken }),
         setCvId: (cvId) => set({ cvId }),
+
+        settings: {
+          notifications: "important",
+          weekly_report: true,
+          theme: "dark",
+          groq_api_key: "",
+          nvidia_api_key: "",
+        },
+        setSettings: (settings) => set({ settings }),
+        updateSetting: (key, value) =>
+          set((s) => ({ settings: { ...s.settings, [key]: value } })),
 
         jobs: [],
         jobsLoading: false,
@@ -84,15 +112,18 @@ export const useAppStore = create<AppState>()(
       }),
       {
         name: "careerpilot-storage",
-        partialize: (state) => ({
-          // Persist these fields across reloads
-          cvId: state.cvId,
-          userId: state.userId,
-          applications: state.applications,
-          todos: state.todos,
-          goals: state.goals,
-          stats: state.stats,
-        }),
+        partialize: (state) => {
+          const { groq_api_key, nvidia_api_key, ...restSettings } = state.settings;
+          return {
+            cvId: state.cvId,
+            userId: state.userId,
+            applications: state.applications,
+            todos: state.todos,
+            goals: state.goals,
+            stats: state.stats,
+            settings: restSettings,
+          };
+        },
       }
     )
   )

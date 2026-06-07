@@ -1,3 +1,4 @@
+import re
 import os
 import uuid
 import tempfile
@@ -5,13 +6,16 @@ from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
 from backend.db.supabase_client import get_supabase_client
-from backend.auth import get_current_user
+from backend.auth import get_current_user, get_user_supabase_client
+from backend.logger import get_logger
+
+logger = get_logger("cv")
 
 router = APIRouter()
 
 
 @router.get("/api/cv/sections/{cv_id}")
-async def get_cv_sections(cv_id: str, supabase=Depends(get_supabase_client), user=Depends(get_current_user)):
+async def get_cv_sections(cv_id: str, supabase=Depends(get_user_supabase_client), user=Depends(get_current_user)):
     """Fetch parsed CV sections for display."""
     user_id = str(user.id) if user.id else None
     if not user_id:
@@ -21,6 +25,8 @@ async def get_cv_sections(cv_id: str, supabase=Depends(get_supabase_client), use
     if not cv_result.data:
         raise HTTPException(status_code=404, detail="CV not found")
     cv = cv_result.data[0]
+    if cv.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden: cannot access another user's CV")
 
     chunks_result = supabase.table("cv_chunks").select("*").eq("cv_id", cv_id).execute()
     return {
@@ -38,30 +44,47 @@ async def get_cv_sections(cv_id: str, supabase=Depends(get_supabase_client), use
 async def upload_cv(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    supabase=Depends(get_supabase_client),
+    supabase=Depends(get_user_supabase_client),
     user=Depends(get_current_user),
 ):
     user_id = str(user.id) if user.id else None
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    print(f"[CV] Upload request received for file: {file.filename}")
+    logger.info("Upload request received for file: %s", file.filename)
 
-    # Verify file extension
+    # Verify file extension and sanitize filename
     file_ext = os.path.splitext(file.filename)[-1].lower() if file.filename else ""
+
+    # Secure filename: strip path and allow only safe characters
+    safe_name = os.path.basename(file.filename) if file.filename else "upload"
+    safe_name = re.sub(r'[^A-Za-z0-9._-]', '_', safe_name)
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+
     if file_ext not in [".pdf", ".docx"]:
         raise HTTPException(status_code=400, detail="Unsupported file type. Only PDF and DOCX files are allowed.")
 
-    # Save file to temp dir
-    tmp_path = os.path.join(tempfile.gettempdir(), f"careerpilot_{uuid.uuid4()}_{file.filename}")
+    # Read content for magic-byte validation
+    content = await file.read()
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Empty file.")
+
+    # Magic-byte verification
+    if file_ext == ".pdf" and content[:5] != b"%PDF-":
+        raise HTTPException(status_code=400, detail="File extension mismatch: not a valid PDF.")
+    if file_ext == ".docx" and content[:2] not in (b"PK",):
+        raise HTTPException(status_code=400, detail="File extension mismatch: not a valid DOCX.")
+
+    # Save file to temp dir using safe name
+    tmp_path = os.path.join(tempfile.gettempdir(), f"careerpilot_{uuid.uuid4()}_{safe_name}")
     try:
-        content = await file.read()
         with open(tmp_path, "wb") as f:
             f.write(content)
-        print(f"[CV] File saved to {tmp_path}")
+        logger.info("File saved to %s", tmp_path)
     except Exception as e:
-        print(f"[CV ERROR] Failed to save file: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+        logger.error("Failed to save file: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to save file.")
 
     # Upsert user record in users table
     user_result = supabase.table("users").select("*").eq("clerk_id", user_id).execute()
@@ -76,7 +99,7 @@ async def upload_cv(
     cv_data = {
         "id": cv_id,
         "user_id": db_user_id,
-        "filename": file.filename,
+        "filename": safe_name,
         "original_content": "",
         "processing_status": "pending",
         "sections": {},
@@ -89,17 +112,17 @@ async def upload_cv(
     try:
         result = supabase.table("cvs").insert(cv_data).execute()
         cv = result.data[0]
-        print(f"[CV] Created CV record: {cv['id']}")
+        logger.info("Created CV record: %s", cv["id"])
     except Exception as e:
-        print(f"[CV ERROR] Failed to create CV record: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to create CV record: {str(e)}")
+        logger.error("Failed to create CV record: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to create CV record.")
 
     # Kick off background processing
     try:
         from backend.workers.cv_worker import parse_and_index_cv
         background_tasks.add_task(parse_and_index_cv, cv["id"], tmp_path)
-        print(f"[CV] Background processing task queued for CV {cv['id']}")
+        logger.info("Background processing task queued for CV %s", cv["id"])
     except Exception as e:
-        print(f"[CV ERROR] Failed to queue background task: {e}")
+        logger.error("Failed to queue background task: %s", e)
 
     return {"cv_id": cv["id"], "status": "queued"}

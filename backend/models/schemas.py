@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Optional, Union
 from enum import Enum
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 class ApplicationStatus(str, Enum):
     applied = "applied"
@@ -35,10 +35,9 @@ class ApplicationUpdate(BaseModel):
 
 class ApplicationResponse(ApplicationBase):
     id: str
-    applied_at: datetime
-    updated_at: datetime
+    applied_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
-    # Enable serialization from ORM models in Pydantic v2
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -92,6 +91,10 @@ class GoalCreate(BaseModel):
     priority: Optional[str] = Field(None, pattern="^(high|medium|low)$")
     target_date: Optional[date] = None
 
+    @field_serializer("target_date")
+    def _ser_date(self, v: Optional[date]) -> Optional[str]:
+        return v.isoformat() if v is not None else None
+
 class GoalUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1)
     description: Optional[str] = Field(None, max_length=120)
@@ -99,6 +102,10 @@ class GoalUpdate(BaseModel):
     priority: Optional[str] = Field(None, pattern="^(high|medium|low)$")
     target_date: Optional[date] = None
     progress: Optional[int] = Field(None, ge=0, le=100)
+
+    @field_serializer("target_date")
+    def _ser_date(self, v: Optional[date]) -> Optional[str]:
+        return v.isoformat() if v is not None else None
 
 class GoalResponse(BaseModel):
     id: str
@@ -111,5 +118,9 @@ class GoalResponse(BaseModel):
     progress: int
     source: Optional[str] = None
     created_at: datetime
+
+    @field_serializer("target_date")
+    def _ser_date(self, v: Optional[date]) -> Optional[str]:
+        return v.isoformat() if v is not None else None
 
     model_config = ConfigDict(from_attributes=True)

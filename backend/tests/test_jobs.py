@@ -11,23 +11,15 @@ if str(root_path) not in sys.path:
 if str(root_path / "integrations") not in sys.path:
     sys.path.insert(0, str(root_path / "integrations"))
 
-# Mock out external third-party dependencies
-mock_requests = MagicMock()
-sys.modules['requests'] = mock_requests
-
+# Mock out external third-party dependencies that are heavy and not used by
+# the test targets.  We deliberately do NOT mock `requests` here — the real
+# library is installed and `pyiceberg` (a transitive dep of `supabase`) needs
+# the genuine `requests.auth` module at import time.
 mock_dotenv = MagicMock()
 sys.modules['dotenv'] = mock_dotenv
 
-mock_openai = MagicMock()
-sys.modules['openai'] = mock_openai
-
 mock_pinecone = MagicMock()
 sys.modules['pinecone'] = mock_pinecone
-
-mock_google = MagicMock()
-sys.modules['google'] = mock_google
-mock_genai = mock_google.generativeai
-sys.modules['google.generativeai'] = mock_genai
 
 # Import functions under test
 from integrations.job_hunter import parse_job

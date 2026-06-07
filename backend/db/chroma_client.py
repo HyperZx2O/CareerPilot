@@ -12,7 +12,7 @@ def get_chroma_client():
     host = os.getenv("CHROMA_HOST", "http://localhost:8001")
     # Ensure trailing slash removed for HttpClient compatibility
     host = host.rstrip('/')
-    return HttpClient(host=host, settings=Settings(allow_reset=True))
+    return HttpClient(host=host, settings=Settings(allow_reset=False))
 
 
 def get_collection(name: str):

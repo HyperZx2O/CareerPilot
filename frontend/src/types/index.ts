@@ -103,6 +103,14 @@ export interface DashboardStats {
   skills_count: number;
   roadmap_progress: number;
   streak_days: number;
+  top_jobs: Array<{
+    title: string;
+    company: string;
+    location: string;
+    salary: string;
+    url: string;
+    source: string;
+  }>;
 }
 
 export interface NudgeResponse {

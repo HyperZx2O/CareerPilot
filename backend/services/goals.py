@@ -1,30 +1,36 @@
 import json
 import os
 from backend.prompts.goals import GOAL_GENERATION_PROMPT, GOAL_TITLE_MAX, GOAL_DESC_MAX
+from backend.logger import get_logger
+
+logger = get_logger("goals")
+
+
+def _is_placeholder(val: str) -> bool:
+    if not val:
+        return True
+    return val.startswith("your_") or val == "your-key-here"
 
 
 def _call_llm(prompt: str) -> str:
-    """Call Groq (preferred) or NVIDIA NIM for text generation."""
     groq_key = os.getenv("GROQ_API_KEY")
     nvidia_key = os.getenv("NVIDIA_API_KEY")
 
-    if groq_key and "your_" not in groq_key:
-        import urllib.request
-        req = urllib.request.Request(
-            "https://api.groq.com/openai/v1/chat/completions",
-            data=json.dumps({
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.7,
-                "max_tokens": 600,
-            }).encode(),
-            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read())
-            return data["choices"][0]["message"]["content"].strip()
+    if groq_key and not _is_placeholder(groq_key):
+        try:
+            from groq import Groq
+            client = Groq(api_key=groq_key)
+            res = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                timeout=20,
+            )
+            return res.choices[0].message.content.strip()
+        except Exception as e:
+            logger.warning("Groq call failed: %s", e)
 
-    if nvidia_key and "your_" not in nvidia_key:
+    if nvidia_key and not _is_placeholder(nvidia_key):
         import urllib.request
         req = urllib.request.Request(
             "https://integrate.api.nvidia.com/v1/chat/completions",
@@ -57,7 +63,7 @@ def generate_career_goals(skill_summary: str) -> list[dict]:
     try:
         raw = _call_llm(prompt)
     except Exception as e:
-        print(f"[GOALS] LLM call failed: {e}")
+        logger.warning("LLM call failed: %s", e)
         # Return a sensible default so the feature doesn't hard-fail
         return [
             {
@@ -90,7 +96,7 @@ def generate_career_goals(skill_summary: str) -> list[dict]:
         parsed = json.loads(raw_clean)
         goals = parsed.get("goals", [])
     except json.JSONDecodeError:
-        print(f"[GOALS] Could not parse LLM output as JSON: {raw[:100]}")
+        logger.warning("Could not parse LLM output as JSON: %s", raw[:100])
         goals = []
 
     if not goals:

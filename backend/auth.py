@@ -1,16 +1,33 @@
 import os
+import re
+from urllib.parse import urlparse
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt
 import requests
+from backend.logger import get_logger
+from backend.db.supabase_client import get_supabase_user_client
 
-# Clerk JWKS URL – usually https://api.clerk.dev/v1/jwks
+logger = get_logger("auth")
+
 JWKS_URL = os.getenv("CLERK_JWKS_URL", "https://api.clerk.dev/v1/jwks")
 
-http_bearer = HTTPBearer(auto_error=False)
+_allowed_jwks_domains = {"api.clerk.dev", "clerk.com"}
+
+def _validate_jwks_url(url: str) -> str:
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        raise ValueError("Invalid JWKS URL")
+    hostname = parsed.hostname or ""
+    if not any(hostname == domain or hostname.endswith("." + domain) for domain in _allowed_jwks_domains):
+        raise ValueError(f"JWKS URL domain '{hostname}' not allowed")
+    if parsed.scheme not in ("https",):
+        raise ValueError("JWKS URL must use HTTPS")
+    return url
 
 def get_jwks():
-    resp = requests.get(JWKS_URL)
+    url = _validate_jwks_url(JWKS_URL)
+    resp = requests.get(url, timeout=10)
     resp.raise_for_status()
     return resp.json()
 
@@ -22,27 +39,49 @@ def verify_jwt(token: str):
         key = next((k for k in jwks["keys"] if k["kid"] == kid), None)
         if not key:
             raise HTTPException(status_code=401, detail="Invalid token")
-        return jwt.decode(token, key, algorithms=["RS256"], audience=os.getenv("CLERK_AUDIENCE"))
+        expected_issuer = os.getenv("CLERK_ISSUER", "https://api.clerk.dev")
+        return jwt.decode(
+            token,
+            key,
+            algorithms=["RS256"],
+            audience=os.getenv("CLERK_AUDIENCE"),
+            issuer=expected_issuer,
+        )
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"[AUTH] JWT decoding failed or JWKS not reachable: {e}")
+        logger.warning("JWT decoding failed or JWKS not reachable: %s", e)
         raise HTTPException(status_code=401, detail="Invalid token")
 
+http_bearer = HTTPBearer(auto_error=False)
+
+class AuthUser:
+    def __init__(self, id: str, email: str, jwt: str | None = None):
+        self.id = id
+        self.email = email
+        self.jwt = jwt
+
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(http_bearer)):
-    # Fallback to local demo user if no token is provided (essential for local dev & offline demo ease)
+    env = os.getenv("ENV", "development").lower()
+
+    dev_demo_enabled = os.getenv("DEV_DEMO_USER_ENABLED", "").lower() in ("1", "true", "yes")
     if not credentials:
-        print("[AUTH] No token provided. Using default demo user.")
-        return type("User", (), {"id": "demo_user_123", "email": "demo@careerpilot.ai"})
-        
+        if env != "production" and dev_demo_enabled:
+            logger.info("No token provided — using default demo user (dev only)")
+            return AuthUser(id="demo_user_123", email="demo@careerpilot.ai", jwt=None)
+        raise HTTPException(status_code=401, detail="Authentication required")
+
     token = credentials.credentials
-    # Fast bypass for test/mock tokens
-    if token in ["mock_token", "undefined", "null"] or token.startswith("test_"):
-        return type("User", (), {"id": "demo_user_123", "email": "demo@careerpilot.ai"})
-        
-    try:
-        payload = verify_jwt(token)
-        return type("User", (), {"id": payload.get("sub", "demo_user_123"), "email": payload.get("email", "demo@careerpilot.ai")})
-    except Exception:
-        # Fallback to keep local demo running even if token expired/invalid
-        print("[AUTH WARNING] Token validation failed. Falling back to default demo user.")
-        return type("User", (), {"id": "demo_user_123", "email": "demo@careerpilot.ai"})
+    payload = verify_jwt(token)
+    return AuthUser(id=payload.get("sub", ""), email=payload.get("email", ""), jwt=token)
+
+
+async def get_user_supabase_client(user: AuthUser = Depends(get_current_user)):
+    """FastAPI dependency that provides a Supabase client scoped to the authenticated user."""
+    return get_supabase_user_client(user.jwt)
+
+
+def scoped_client(user: AuthUser):
+    """Helper to get a user-scoped Supabase client outside of FastAPI dependencies."""
+    return get_supabase_user_client(user.jwt)
 

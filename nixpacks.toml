@@ -1,0 +1,9 @@
+[phases.setup]
+nixPkgs = ["python311", "nodejs_20", "uv"]
+cmd = "uv venv && uv pip install -r backend/requirements.txt -r integrations/requirements.txt groq svix sentry-sdk"
+
+[phases.build]
+cmd = "cd frontend && npm ci && npm run build"
+
+[start]
+cmd = "uv run uvicorn backend.main:app --host 0.0.0.0 --port $PORT"

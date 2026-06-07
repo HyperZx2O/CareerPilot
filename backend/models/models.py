@@ -1,80 +1,68 @@
-import uuid
-from sqlalchemy import Column, String, Integer, Date, DateTime, Boolean
-from sqlalchemy.sql import func
-from backend.db.supabase_client import Base
+"""
+DEPRECATED — kept as a stub to avoid breaking any stray imports.
 
-class Application(Base):
-    __tablename__ = "applications"
+The SQLAlchemy ORM models in this file are no longer used for production
+database access.  All persistence goes through the Supabase REST client in
+`backend/db/supabase_client.py` and is described in code by the Pydantic
+schemas in `backend/models/schemas.py`.
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, nullable=True)
-    job_title = Column(String, nullable=False)
-    company = Column(String, nullable=False)
-    location = Column(String, nullable=True)
-    deadline = Column(Date, nullable=True)
-    status = Column(
-        String, 
-        nullable=False, 
-        default="applied", 
-        server_default="applied"
-    )
-    notes = Column(String, nullable=True)
-    job_id = Column(String, nullable=True)
-    fit_score = Column(Integer, nullable=True)
-    applied_at = Column(
-        DateTime(timezone=True), 
-        nullable=False, 
-        server_default=func.now(), 
-        default=func.now()
-    )
-    updated_at = Column(
-        DateTime(timezone=True), 
-        nullable=False, 
-        server_default=func.now(), 
-        default=func.now(), 
-        onupdate=func.now()
-    )
+The previous file inherited from `Base`, which is now `None`, causing
+`TypeError: NoneType takes no arguments` on import.  This stub preserves the
+public names so any code that does `from backend.models.models import X`
+keeps working in tests.
+"""
 
-class ActivityLog(Base):
-    __tablename__ = "activity_log"
+from __future__ import annotations
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, nullable=True)
-    action = Column(String, nullable=False)
-    created_at = Column(
-        DateTime(timezone=True), 
-        nullable=False, 
-        server_default=func.now(), 
-        default=func.now()
-    )
+from dataclasses import dataclass
+from typing import Optional
 
-class Todo(Base):
-    __tablename__ = "todos"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, nullable=True)
-    title = Column(String, nullable=False)
-    due_date = Column(Date, nullable=True)
-    done = Column(Boolean, nullable=False, default=False, server_default="0")
-    goal_id = Column(String, nullable=True)
-    created_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-        default=func.now()
-    )
+@dataclass
+class Application:
+    id: str = ""
+    user_id: Optional[str] = None
+    job_title: str = ""
+    company: str = ""
+    location: Optional[str] = None
+    deadline: Optional[str] = None
+    status: str = "applied"
+    notes: Optional[str] = None
+    job_id: Optional[str] = None
+    fit_score: Optional[int] = None
+    applied_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
-class Goal(Base):
-    __tablename__ = "goals"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, nullable=True)
-    title = Column(String, nullable=False)
-    target_date = Column(Date, nullable=True)
-    progress = Column(Integer, nullable=False, default=0, server_default="0")
-    created_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-        default=func.now()
-    )
+@dataclass
+class ActivityLog:
+    id: str = ""
+    user_id: Optional[str] = None
+    application_id: Optional[str] = None
+    event: str = ""
+    detail: Optional[dict] = None
+    created_at: Optional[str] = None
+
+
+@dataclass
+class Todo:
+    id: str = ""
+    user_id: Optional[str] = None
+    application_id: Optional[str] = None
+    goal_id: Optional[str] = None
+    title: str = ""
+    done: bool = False
+    due_at: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+@dataclass
+class Goal:
+    id: str = ""
+    user_id: Optional[str] = None
+    title: str = ""
+    description: Optional[str] = None
+    progress: int = 0
+    status: str = "active"
+    target_date: Optional[str] = None
+    created_at: Optional[str] = None
