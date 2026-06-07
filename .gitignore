@@ -1,28 +1,8 @@
-# Python
-__pycache__/
-*.py[cod]
-.pytest_cache/
-
-# Virtual environments
-.venv/
-venv/
-
-# Local env files and secrets
-.env
-.env.*
-.repowise/
-
-# Editor directories
-.vscode/
-
-# Node / Next
-node_modules/
-.next/
-
-# OS files
-.DS_Store
 # ==============================================================================
-# CareerPilot - Context-Aware .gitignore
+# CareerPilot - .gitignore
+# Tuned to the actual files in this repo (Python/FastAPI backend + Next.js
+# frontend).  Stale tooling stubs (Scrapy, SageMath, PyInstaller, Flask, Django,
+# pipenv/poetry/pdm, Jupyter, mkdocs) have been removed.
 # ==============================================================================
 
 # --- System & OS files ---
@@ -30,6 +10,7 @@ node_modules/
 .DS_Store?
 ehthumbs.db
 Thumbs.db
+desktop.ini
 
 # --- IDEs & Editors ---
 .vscode/
@@ -40,201 +21,95 @@ Thumbs.db
 *.sln
 *.sw?
 
-# --- Tooling & Agent Workspace Caches ---
+# --- AI agent / tooling caches ---
 .claude/
-.dual-graph/
 .puku/
+.opencode/
 .repowise/
+.dual-graph/
 .understand-anything/
 .gemini/
-
-# --- General Environment Files ---
-.env
-.env.local
-.env.*.local
 
 # ==============================================================================
 # Backend (Python / FastAPI)
 # ==============================================================================
 
-# Byte-compiled / optimized / DLL files
+# Byte-compiled / optimized
 __pycache__/
 *.py[cod]
 *$py.class
 
-# C extensions
-*.so
-
 # Distribution / packaging
-.Python
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit testing / coverage reports
+# Unit testing / coverage
+.pytest_cache/
 htmlcov/
-.tox/
-.nosexy
 .coverage
 .coverage.*
-.cache
-nosetests.xml
 coverage.xml
 *.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-.pybuilder/
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-#   For a library or package, you might want to share your .python-version.
-#   For an app, this is usually fine to prevent version mismatches.
-# .python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, if you're executing pipenv in a setup that doesn't use it, you might ignore the lockfile.
-#Pipfile.lock
-
-# poetry
-#   Similar to Pipfile.lock, poetry.lock is generally recommended to be committed.
-#poetry.lock
-
-# pdm
-#   Similar to Pipfile.lock, pdm.lock is generally recommended to be committed.
-#pdm.lock
-
-# PEP 582; treats compiled packages as local directories
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
+.tox/
+.cache
 
 # Environments
 .env
-.venv
-env/
+.env.local
+.env.*.local
+.venv/
 venv/
+env/
 ENV/
-env.bak/
-venv.bak/
 
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
+# mypy / type checkers
 .mypy_cache/
 .dmypy.json
 dmypy.json
 
-# Pyre type checker
-.pyre/
+# Celery (this project uses Celery workers)
+celerybeat-schedule
+celerybeat.pid
 
-# pytype static analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# Specific Backend database files
+# Project-specific backend artefacts
+backend/uploads/
 backend/*.db
 backend/*.sqlite
-backend/careerpilot.db
-backend/careerpilot.db-journal
+server.err
 
 # ==============================================================================
 # Frontend (Node / Next.js)
 # ==============================================================================
 
-# Dependency directories
-frontend/node_modules/
+# Dependencies
 node_modules/
+frontend/node_modules/
 
-# Next.js build outputs
-frontend/.next/
+# Next.js build output
 .next/
+frontend/.next/
 frontend/out/
 out/
 
 # Production build output
-frontend/build/
 build/
+frontend/build/
 
-# Next.js telemetry / debug logs
+# Next.js debug / telemetry logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
 frontend/.pnpm-debug.log*
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
+
+# Next.js types and cache
+frontend/.next/cache/
+frontend/next-env.d.ts.bak
+frontend/.swc/
 
 # Frontend environment files
 frontend/.env.local
@@ -243,31 +118,26 @@ frontend/.env.test.local
 frontend/.env.production.local
 
 # ==============================================================================
-# Project-Specific
+# Project-wide
 # ==============================================================================
 
-# Uploaded CVs and files
-backend/uploads/
-uploads/
+# Logs
+*.log
+logs/
 
 # Temp / working directories
 tmp/
 temp/
 *.tmp
 
-# Vercel / Railway deployment configs (may contain secrets)
+# Deployment configs (may contain secrets)
 .vercel/
+.netlify/
 .railway/
 
-# Supabase local dev (if using supabase CLI)
-supabase/.branches/
-supabase/.temp/
-supabase/config.toml
+# OS metadata
+*~
 
-# Turborepo (if using monorepo)
-frontend/.turbo/
-.turbo/
-
-# Log files
-*.log
-logs/
+# Allow specific files even if a parent pattern matches
+!frontend/.env.example
+!backend/.env.example
