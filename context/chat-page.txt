@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { sendChatMessage, getChatHistory } from "@/lib/api";
+import { sendChatMessage } from "@/lib/api";
 import type { ChatMessage } from "@/types";
 import { Send, Bot, User, RefreshCw } from "lucide-react";
 
@@ -173,31 +173,6 @@ export default function ChatPage() {
   const [showSuggestions, setShowSuggestions] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Load prior chat history on mount. Backend currently returns [] until
-  // GET /api/chat/messages is exposed; this call is a no-op today and a
-  // safe forward-compat hook.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const history = await getChatHistory("demo_user_123");
-        if (cancelled || !history || history.length === 0) return;
-        setMessages(
-          history.map((m) => ({
-            role: m.role as "user" | "assistant",
-            content: m.content,
-          }))
-        );
-        setShowSuggestions(false);
-      } catch {
-        // Silently fall back to fresh session.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

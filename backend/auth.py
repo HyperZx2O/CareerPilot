@@ -65,6 +65,20 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(
     env = os.getenv("ENV", "development").lower()
 
     dev_demo_enabled = os.getenv("DEV_DEMO_USER_ENABLED", "").lower() in ("1", "true", "yes")
+
+    # Dev bypass: explicit "Bearer dev:<user_id>" marker from the frontend when
+    # the user is not signed in. Must be enabled by DEV_DEMO_USER_ENABLED=1.
+    if (
+        credentials
+        and dev_demo_enabled
+        and env != "production"
+        and isinstance(credentials.credentials, str)
+        and credentials.credentials.startswith("dev:")
+    ):
+        dev_user_id = credentials.credentials[4:] or "demo_user_123"
+        logger.info(f"Dev demo token provided — using '{dev_user_id}' (dev only)")
+        return AuthUser(id=dev_user_id, email=f"{dev_user_id}@careerpilot.ai", jwt=None)
+
     if not credentials:
         if env != "production" and dev_demo_enabled:
             logger.info("No token provided — using default demo user (dev only)")

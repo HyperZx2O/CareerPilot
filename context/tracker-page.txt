@@ -5,12 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   getApplications, createApplication, updateApplication, deleteApplication,
   getGoals, getTodos, updateTodo, generateRoadmap, createGoal, generateGoals,
-  deleteGoal,
 } from "@/lib/api";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useAppStore } from "@/store/useAppStore";
 import type { Application, ApplicationStatus, Todo } from "@/types";
 import { Plus, Sparkles, Bot, Target, Trash2, ChevronRight } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
+
 const COLUMNS: { status: ApplicationStatus; label: string; color: string; icon: string }[] = [
   { status: "applied",      label: "Applied",      color: "#6366f1", icon: "📨" },
   { status: "interviewing", label: "Interviewing", color: "#f59e0b", icon: "🎤" },
@@ -143,30 +144,24 @@ export default function TrackerPage() {
   const setGoals = useAppStore((s) => s.setGoals);
   const setTodos = useAppStore((s) => s.setTodos);
 
-  const userId = useAppStore((s) => s.userId);
-
-  async function loadAll(uid: string) {
+  async function loadAll() {
     try {
-      const [appsList, goalsList, todosList] = await Promise.all([
-        getApplications(uid),
-        getGoals(uid),
-        getTodos(uid),
+      const [appsData, goalsData, todosData] = await Promise.all([
+        getApplications(getUserId()),
+        getGoals(getUserId()),
+        getTodos(getUserId()),
       ]);
-      setApplications(appsList);
-      setGoals(goalsList);
-      setTodos(todosList);
-      if (goalsList.length > 0 && !selectedGoalId) {
-        setSelectedGoalId(goalsList[0].id);
+      setApplications(appsData);
+      setGoals(goalsData);
+      setTodos(todosData);
+      if (goalsData.length > 0 && !selectedGoalId) {
+        setSelectedGoalId(goalsData[0].id);
       }
     } catch { setError("Failed to load data"); }
     setLoading(false);
   }
 
-  useEffect(() => {
-    const uid = userId || process.env.NEXT_PUBLIC_DEMO_USER_ID || "demo_user_123";
-    loadAll(uid);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  useEffect(() => { loadAll(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleGenerateGoals() {
     setGeneratingGoals(true);
@@ -197,17 +192,13 @@ export default function TrackerPage() {
   }
 
   async function handleDeleteGoal(id: string) {
-    const prevGoals = useAppStore.getState().goals;
-    const prevSelected = selectedGoalId;
-    setGoals(prevGoals.filter((g) => g.id !== id));
-    if (selectedGoalId === id) setSelectedGoalId(prevGoals[0]?.id ?? "");
+    const currentGoals = useAppStore.getState().goals;
+    setGoals(useAppStore.getState().goals.filter((g) => g.id !== id));
+    if (selectedGoalId === id) setSelectedGoalId(currentGoals[0]?.id ?? "");
     try {
+      const { deleteGoal } = await import("@/lib/api");
       await deleteGoal(id);
-    } catch {
-      setGoals(prevGoals);
-      setSelectedGoalId(prevSelected);
-      setError("Failed to delete goal");
-    }
+    } catch { setError("Failed to delete goal"); }
   }
 
   async function handleGenerateRoadmap() {
@@ -230,14 +221,8 @@ export default function TrackerPage() {
 
   async function handleToggleTodo(todo: Todo) {
     const newDone = !todo.done;
-    const prevTodos = useAppStore.getState().todos;
-    setTodos(prevTodos.map((t) => (t.id === todo.id ? { ...t, done: newDone } : t)));
-    try {
-      await updateTodo(todo.id, { done: newDone });
-    } catch {
-      setTodos(prevTodos);
-      setError("Failed to update todo");
-    }
+    setTodos(useAppStore.getState().todos.map((t) => (t.id === todo.id ? { ...t, done: newDone } : t)));
+    try { await updateTodo(todo.id, { done: newDone }); } catch { setError("Failed to update todo"); }
   }
 
   async function handleAdd(e: React.FormEvent) {
@@ -259,15 +244,13 @@ export default function TrackerPage() {
       applied_at: now,
       updated_at: now,
     };
-    const prevApps = useAppStore.getState().applications;
-    setApplications([newApp, ...prevApps]);
+    setApplications([newApp, ...useAppStore.getState().applications]);
     try {
       const app = await createApplication(newApp);
       if (app && app.id) {
         setApplications([app, ...useAppStore.getState().applications.filter((a) => a.id !== newApp.id)]);
       }
     } catch {
-      setApplications(prevApps);
       setError("Failed to add application");
     }
     setFormTitle("");
@@ -276,25 +259,13 @@ export default function TrackerPage() {
   }
 
   async function handleMove(id: string, newStatus: ApplicationStatus) {
-    const prev = useAppStore.getState().applications;
-    setApplications(prev.map((a) => (a.id === id ? { ...a, status: newStatus } : a)));
-    try {
-      await updateApplication(id, { status: newStatus });
-    } catch {
-      setApplications(prev);
-      setError("Failed to update application");
-    }
+    setApplications(useAppStore.getState().applications.map((a) => a.id === id ? { ...a, status: newStatus } : a));
+    try { await updateApplication(id, { status: newStatus }); } catch { setError("Failed to update application"); }
   }
 
   async function handleDelete(id: string) {
-    const prev = useAppStore.getState().applications;
-    setApplications(prev.filter((a) => a.id !== id));
-    try {
-      await deleteApplication(id);
-    } catch {
-      setApplications(prev);
-      setError("Failed to delete application");
-    }
+    setApplications(useAppStore.getState().applications.filter((a) => a.id !== id));
+    try { await deleteApplication(id); } catch { setError("Failed to delete application"); }
   }
 
   const roadmapTodos = useMemo(() => {

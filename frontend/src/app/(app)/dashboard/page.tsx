@@ -7,7 +7,6 @@ import type { DashboardStats, NudgeResponse } from "@/types";
 import { TrendingUp, TrendingDown, Zap, Brain, Flame, Map, ExternalLink } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
-import { useUser } from "@clerk/nextjs";
 
 function getUserId(): string {
   return useAppStore.getState().userId || process.env.NEXT_PUBLIC_DEMO_USER_ID || "demo_user_123";

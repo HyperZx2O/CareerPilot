@@ -52,7 +52,7 @@ async def compute_job_fit_score(cv_id: str, job: dict) -> dict:
 @router.get("/api/jobs/search")
 async def search_jobs_endpoint(
     q: str = Query(..., min_length=1, max_length=200, description="Job search query keywords"),
-    location: str = Query("bd", min_length=2, max_length=50, description="Job location (country code, city, or country name)"),
+    location: str = Query("bd", min_length=2, max_length=10, pattern=r"^[a-z]{2}$", description="Job location code (e.g. 'bd' or 'gb')"),
     cv_id: str = Query(None, description="Optional CV UUID to calculate fit score"),
     user = Depends(get_current_user),
 ):

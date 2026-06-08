@@ -1,6 +1,8 @@
 import os
+import base64
 os.environ["ENV"] = "test"
-os.environ["CLERK_WEBHOOK_SECRET"] = "whsec_test_secret"
+# Must be valid base64 (svix strips whsec_ prefix and base64-decodes)
+os.environ["CLERK_WEBHOOK_SECRET"] = "whsec_" + base64.b64encode(b"test-secret-key-32chars!").decode()
 os.environ["JSEARCH_API_KEY"] = "test-key"
 os.environ["SUPABASE_URL"] = "https://test.supabase.co"
 os.environ["SUPABASE_ANON_KEY"] = "test-anon-key"
@@ -15,10 +17,12 @@ from datetime import datetime, timezone
 client = TestClient(app)
 
 
-def _sign_payload(payload_str: str, secret: str, msg_id: str = "msg_test") -> tuple[str, str, str]:
+VALID_WEBHOOK_SECRET = os.environ["CLERK_WEBHOOK_SECRET"]
+
+def _sign_payload(payload_str: str, secret: str | None = None, msg_id: str = "msg_test") -> tuple[str, str, str]:
     ts = datetime.now(timezone.utc)
     from svix import Webhook
-    wh = Webhook(secret)
+    wh = Webhook(secret or VALID_WEBHOOK_SECRET)
     sig = wh.sign(msg_id, ts, payload_str)
     return msg_id, str(int(ts.timestamp())), sig
 
@@ -44,7 +48,7 @@ class TestClerkWebhook:
             },
         })
 
-        svix_id, ts, sig = _sign_payload(payload_str, "whsec_test_secret")
+        svix_id, ts, sig = _sign_payload(payload_str)
         resp = client.post(
             "/api/webhooks/clerk",
             content=payload_str,
@@ -69,7 +73,7 @@ class TestClerkWebhook:
             },
         })
 
-        svix_id, ts, sig = _sign_payload(payload_str, "whsec_test_secret")
+        svix_id, ts, sig = _sign_payload(payload_str)
         resp = client.post(
             "/api/webhooks/clerk",
             content=payload_str,
@@ -105,7 +109,7 @@ class TestClerkWebhook:
             "data": {"id": "sess_xyz"},
         })
 
-        svix_id, ts, sig = _sign_payload(payload_str, "whsec_test_secret")
+        svix_id, ts, sig = _sign_payload(payload_str)
         resp = client.post(
             "/api/webhooks/clerk",
             content=payload_str,

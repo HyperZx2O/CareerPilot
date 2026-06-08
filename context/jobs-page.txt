@@ -61,11 +61,11 @@ function JobCard({ job, index }: { job: Job; index: number }) {
         `/api/jobs/${job.id}/cover-letter`,
         {
           method: "POST",
-          body: {
+          body: JSON.stringify({
             job_title: job.title,
             company: job.company,
             description: job.description,
-          },
+          }),
         }
       );
       setCoverLetterText(res.cover_letter);

@@ -1,26 +1,31 @@
 @echo off
-title CareerPilot Launcher
-echo ===================================================
-echo 🚀 CareerPilot — AI-first Career OS
-echo ===================================================
-echo.
-echo Starting FastAPI Backend and Next.js Frontend...
+title CareerPilot
+cd /d "%~dp0"
+
+if not exist ".env" (
+    echo [ERROR] .env not found. Copy .env.example to .env and fill in your API keys.
+    pause
+    exit /b 1
+)
+
+echo ============================================
+echo  CareerPilot — Starting Backend + Frontend
+echo ============================================
 echo.
 
-:: Start Backend
-start "CareerPilot Backend" cmd /c "cd backend && title Backend && pip install -r requirements.txt && python -m uvicorn main:app --reload --port 8000"
+echo [1/2] Starting Backend (FastAPI :8000)...
+start "CareerPilot-Backend" cmd /c "uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000"
 
-:: Start Frontend
-start "CareerPilot Frontend" cmd /c "cd frontend && title Frontend && npm run dev"
+timeout /t 4 /nobreak >nul
+
+echo [2/2] Starting Frontend (Next.js :3000)...
+start "CareerPilot-Frontend" cmd /c "cd /d "%~dp0frontend" && npm run dev"
 
 echo.
-echo ===================================================
-echo Both services are starting in separate windows!
+echo Both servers should be starting up.
+echo   Backend  -> http://localhost:8000
+echo   Frontend -> http://localhost:3000
 echo.
-echo 🌐 Frontend: http://localhost:3000
-echo 🔌 Backend:  http://localhost:8000/docs
-echo ===================================================
-echo.
-timeout /t 5 >nul
-start http://localhost:3000
-exit
+echo Close the server windows to stop, or press Ctrl+C here.
+echo ============================================
+pause

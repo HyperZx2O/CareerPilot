@@ -75,19 +75,18 @@ def get_supabase_user_client(user_jwt: str | None = None) -> SupabaseClient:
         logger.warning("SUPABASE_URL or SUPABASE_ANON_KEY not set — falling back to admin client")
         return get_supabase_admin_client()
 
+    try:
+        client = create_client(SUPABASE_URL, anon_key)
         try:
-            client = create_client(SUPABASE_URL, anon_key)
-            try:
-                from supabase.lib.client_options import ClientOptions
-                client.postgrest.auth(user_jwt)
-            except Exception:
-                # In stubbed client, postgrest may not exist
-                pass
-            logger.info("Supabase user client initialized (JWT scope)")
-            return client
-        except Exception as e:
-            logger.warning("Failed to create user-scoped Supabase client: %s — falling back to admin", e)
-            return get_supabase_admin_client()
+            from supabase.lib.client_options import ClientOptions
+            client.postgrest.auth(user_jwt)
+        except Exception:
+            pass
+        logger.info("Supabase user client initialized (JWT scope)")
+        return client
+    except Exception as e:
+        logger.warning("Failed to create user-scoped Supabase client: %s — falling back to admin", e)
+        return get_supabase_admin_client()
 
 def get_db() -> Generator[SupabaseClient, None, None]:
     yield get_supabase_admin_client()

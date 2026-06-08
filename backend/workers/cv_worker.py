@@ -203,11 +203,8 @@ def _parse_and_index_cv_sync(cv_id: str, tmp_path: str = None):
                         "target_role": g.get("target_role", ""),
                         "priority": g.get("priority", "medium"),
                         "progress": 0,
+                        "source": "ai",
                     }
-                    try:
-                        insert_data["source"] = "ai"
-                    except Exception:
-                        pass  # source column may not exist yet
                     supabase.table("goals").insert(insert_data).execute()
                 logger.info("Generated %d career goals for user %s", len(goals), user_id)
     except Exception as e:

@@ -548,7 +548,7 @@ def _compute_streak(user_id: str, user_jwt: str = "") -> int:
 @router.get("/dashboard/stats", tags=["Dashboard"])
 async def get_dashboard_stats(
     user = Depends(get_current_user),
-    user_id: str | None = Query(None, description="UUID of the user (optional, defaults to authenticated user)"),
+    user_id: str = Query(..., description="UUID of the user"),
     cv_id: str | None = Query(None, description="Optional CV UUID to count skills"),
 ):
     """
@@ -558,9 +558,8 @@ async def get_dashboard_stats(
     - roadmap_progress (from goal matching 'roadmap')
     - streak_days (consecutive active days)
     """
-    if user_id is None:
-        user_id = str(user.id)
-    elif user_id != str(user.id):
+    # Validate that requested user_id matches authenticated user
+    if user_id != str(user.id):
         raise HTTPException(status_code=403, detail="Forbidden: cannot access other users' dashboard stats")
     supabase = get_supabase_user_client(user.jwt)
     now = datetime.now(timezone.utc)

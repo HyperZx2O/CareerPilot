@@ -1,21 +1,14 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { ClerkProvider, useAuth, useUser } from "@clerk/nextjs";
 import { useAppStore } from "@/store/useAppStore";
-import { bindAuthTokenAccessor } from "@/lib/api";
 
 function ClerkTokenSync() {
   const { getToken } = useAuth();
   const { user } = useUser();
   const setAuthToken = useAppStore((s) => s.setAuthToken);
   const setUser = useAppStore((s) => s.setUser);
-
-  // Wire the api.ts token accessor once so every apiFetch call gets the
-  // current Clerk JWT (with localStorage fallback if this hasn't mounted yet).
-  useEffect(() => {
-    bindAuthTokenAccessor(() => useAppStore.getState().authToken);
-  }, []);
 
   useEffect(() => {
     if (user) {
