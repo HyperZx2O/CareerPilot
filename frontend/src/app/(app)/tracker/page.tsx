@@ -10,16 +10,18 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useAppStore } from "@/store/useAppStore";
 import type { Application, ApplicationStatus, Todo } from "@/types";
-import { Plus, Sparkles, Bot, Target, Trash2, ChevronRight } from "lucide-react";
-const COLUMNS: { status: ApplicationStatus; label: string; color: string; icon: string }[] = [
-  { status: "applied",      label: "Applied",      color: "#6366f1", icon: "📨" },
-  { status: "interviewing", label: "Interviewing", color: "#f59e0b", icon: "🎤" },
-  { status: "offer",        label: "Offer",         color: "#22c55e", icon: "🎉" },
-  { status: "rejected",     label: "Rejected",     color: "#ef4444", icon: "❌" },
+import { Plus, Sparkles, Bot, Target, Trash2, ChevronRight, Send, Mic, Award, XCircle, Calendar, Map } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import ErrorOverlay from "@/components/ui/ErrorOverlay";
+const COLUMNS: { status: ApplicationStatus; label: string; color: string; icon: LucideIcon }[] = [
+  { status: "applied",      label: "Applied",      color: "#6366f1", icon: Send },
+  { status: "interviewing", label: "Interviewing", color: "#f59e0b", icon: Mic },
+  { status: "offer",        label: "Offer",         color: "#22c55e", icon: Award },
+  { status: "rejected",     label: "Rejected",     color: "#ef4444", icon: XCircle },
 ];
 
 function getUserId(): string {
-  return useAppStore.getState().userId || process.env.NEXT_PUBLIC_DEMO_USER_ID || "demo_user_123";
+  return "demo_user_123";
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -135,15 +137,12 @@ export default function TrackerPage() {
   const [goalFormTitle, setGoalFormTitle] = useState("");
   const [goalFormDesc, setGoalFormDesc] = useState("");
   const [goalFormRole, setGoalFormRole] = useState("");
-  const cvId = useAppStore((s) => s.cvId);
   const apps = useAppStore((s) => s.applications);
   const goals = useAppStore((s) => s.goals);
   const todos = useAppStore((s) => s.todos);
   const setApplications = useAppStore((s) => s.setApplications);
   const setGoals = useAppStore((s) => s.setGoals);
   const setTodos = useAppStore((s) => s.setTodos);
-
-  const userId = useAppStore((s) => s.userId);
 
   async function loadAll(uid: string) {
     try {
@@ -163,15 +162,14 @@ export default function TrackerPage() {
   }
 
   useEffect(() => {
-    const uid = userId || process.env.NEXT_PUBLIC_DEMO_USER_ID || "demo_user_123";
-    loadAll(uid);
+    loadAll(getUserId());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, []);
 
   async function handleGenerateGoals() {
     setGeneratingGoals(true);
     try {
-      const result = await generateGoals(getUserId(), cvId ?? undefined);
+      const result = await generateGoals(getUserId());
       setGoals(result.goals);
       if (result.goals.length > 0) setSelectedGoalId(result.goals[0].id);
     } catch { setError("Failed to generate goals"); }
@@ -219,7 +217,6 @@ export default function TrackerPage() {
     try {
       const result = await generateRoadmap({
         user_id: getUserId(),
-        cv_id: cvId ?? undefined,
         goal_id: selectedGoalId,
         target_role: goal.target_role || goal.title,
       });
@@ -336,29 +333,6 @@ export default function TrackerPage() {
     );
   }
 
-  if (error) {
-    return (
-      <motion.div
-        className="mb-4 flex items-center gap-2 rounded-xl border p-3 text-sm animate-fade-in"
-        style={{
-          borderColor: "var(--cp-danger)",
-          background: "rgba(239, 68, 68, 0.1)",
-          color: "var(--cp-danger)",
-        }}
-      >
-        {error}
-        <motion.button
-          onClick={() => setError(null)}
-          className="ml-auto p-1"
-          whileHover={{ scale: 1.2 }}
-          whileTap={{ scale: 0.9 }}
-        >
-          ✕
-        </motion.button>
-      </motion.div>
-    );
-  }
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -436,7 +410,7 @@ export default function TrackerPage() {
             >
               <motion.div variants={itemVariants} className="flex-1 min-w-[200px]">
                 <select
-                  className="w-full rounded-xl border bg-[var(--cp-surface-2)] px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500"
+                  className="w-full rounded-xl border bg-[var(--cp-surface-2)] px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                   style={{ borderColor: "var(--cp-border)", color: "var(--cp-text)" }}
                   value={selectedGoalId}
                   onChange={(e) => setSelectedGoalId(e.target.value)}
@@ -633,7 +607,8 @@ export default function TrackerPage() {
                             </p>
                             {todo.due_date && (
                               <p className="mt-1 text-xs" style={{ color: "var(--cp-text-dim)" }}>
-                                📅 {new Date(todo.due_date).toLocaleDateString()}
+                                <Calendar className="mr-1 inline h-3 w-3" style={{ color: "var(--cp-text-dim)" }} />
+                              {new Date(todo.due_date).toLocaleDateString()}
                               </p>
                             )}
                           </motion.div>
@@ -651,12 +626,12 @@ export default function TrackerPage() {
                 animate={{ opacity: 1, scale: 1 }}
               >
                 <motion.div
-                  className="mb-4 text-5xl"
+                  className="mb-4 flex justify-center"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
                 >
-                  🗺️
+                  <Map className="h-12 w-12" style={{ color: "var(--cp-text-dim)" }} strokeWidth={1.5} />
                 </motion.div>
                 <p className="mb-2 text-lg font-medium">No roadmap yet</p>
                 <p className="text-sm">Select a goal and click &ldquo;Generate Roadmap&rdquo; to get started</p>
@@ -753,7 +728,7 @@ export default function TrackerPage() {
                     whileHover={{ borderColor: col.color }}
                   >
                     <div className="mb-4 flex items-center gap-2">
-                      <span className="text-xl">{col.icon}</span>
+                      <col.icon className="h-5 w-5" style={{ color: col.color }} />
                       <h3 className="font-semibold">{col.label}</h3>
                       <motion.span
                         className="ml-auto rounded-full px-2 py-0.5 text-xs font-medium"
@@ -912,6 +887,7 @@ export default function TrackerPage() {
           </motion.div>
         )}
       </AnimatePresence>
+      <ErrorOverlay error={error} onDismiss={() => setError(null)} />
     </motion.div>
   );
 }

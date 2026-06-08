@@ -5,8 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getTodos, createTodo, updateTodo, deleteTodo, getGoals, createGoal } from "@/lib/api";
 import type { Todo, Goal } from "@/types";
 import { Plus, Check, Trash2, Target, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import ErrorOverlay from "@/components/ui/ErrorOverlay";
 
-const DEMO_USER_ID = "demo-user-001";
+const DEMO_USER_ID = "demo_user_123";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -108,8 +109,10 @@ export default function CalendarPage() {
     async function load() {
       try {
         const [t, g] = await Promise.all([getTodos(DEMO_USER_ID), getGoals(DEMO_USER_ID)]);
-        setTodos(t);
-        setGoals(g);
+        // Show only custom (non-AI) goals and unlinked todos so the
+        // calendar isn't cluttered with Tracker's auto-generated content.
+        setTodos(t.filter((todo) => !todo.goal_id));
+        setGoals(g.filter((goal) => goal.source !== "ai"));
       } catch { setError("Failed to load calendar"); }
       setLoading(false);
     }
@@ -187,29 +190,6 @@ export default function CalendarPage() {
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
         />
-      </motion.div>
-    );
-  }
-
-  if (error) {
-    return (
-      <motion.div
-        className="mb-4 flex items-center gap-2 rounded-xl border p-3 text-sm animate-fade-in"
-        style={{
-          borderColor: "var(--cp-danger)",
-          background: "rgba(239, 68, 68, 0.1)",
-          color: "var(--cp-danger)",
-        }}
-      >
-        {error}
-        <motion.button
-          onClick={() => setError(null)}
-          className="ml-auto p-1"
-          whileHover={{ scale: 1.2 }}
-          whileTap={{ scale: 0.9 }}
-        >
-          ✕
-        </motion.button>
       </motion.div>
     );
   }
@@ -447,6 +427,7 @@ export default function CalendarPage() {
           </motion.div>
         </motion.div>
       </div>
+      <ErrorOverlay error={error} onDismiss={() => setError(null)} />
     </motion.div>
   );
 }

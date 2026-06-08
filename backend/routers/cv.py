@@ -14,6 +14,15 @@ logger = get_logger("cv")
 router = APIRouter()
 
 
+def _resolve_db_user_id(supabase, auth_user_id: str) -> str | None:
+    """Convert an auth user id (clerk_id) to the internal `users.id` UUID."""
+    try:
+        row = supabase.table("users").select("id").eq("clerk_id", auth_user_id).limit(1).execute()
+        return row.data[0]["id"] if row.data else None
+    except Exception:
+        return None
+
+
 @router.get("/api/cv/sections/{cv_id}")
 async def get_cv_sections(cv_id: str, supabase=Depends(get_user_supabase_client), user=Depends(get_current_user)):
     """Fetch parsed CV sections for display."""
@@ -25,7 +34,9 @@ async def get_cv_sections(cv_id: str, supabase=Depends(get_user_supabase_client)
     if not cv_result.data:
         raise HTTPException(status_code=404, detail="CV not found")
     cv = cv_result.data[0]
-    if cv.get("user_id") != user_id:
+
+    db_user_id = _resolve_db_user_id(supabase, user_id)
+    if db_user_id and cv.get("user_id") != db_user_id:
         raise HTTPException(status_code=403, detail="Forbidden: cannot access another user's CV")
 
     chunks_result = supabase.table("cv_chunks").select("*").eq("cv_id", cv_id).execute()
@@ -126,3 +137,29 @@ async def upload_cv(
         logger.error("Failed to queue background task: %s", e)
 
     return {"cv_id": cv["id"], "status": "queued"}
+
+
+@router.delete("/api/cv/{cv_id}")
+async def delete_cv(
+    cv_id: str,
+    supabase=Depends(get_user_supabase_client),
+    user=Depends(get_current_user),
+):
+    """Delete a CV and its associated chunks. Only the owner can delete."""
+    user_id = str(user.id) if user.id else None
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    cv_result = supabase.table("cvs").select("*").eq("id", cv_id).execute()
+    if not cv_result.data:
+        raise HTTPException(status_code=404, detail="CV not found")
+    cv = cv_result.data[0]
+
+    db_user_id = _resolve_db_user_id(supabase, user_id)
+    if db_user_id and cv.get("user_id") != db_user_id:
+        raise HTTPException(status_code=403, detail="Forbidden: cannot delete another user's CV")
+
+    supabase.table("cv_chunks").delete().eq("cv_id", cv_id).execute()
+    supabase.table("cvs").delete().eq("id", cv_id).execute()
+    logger.info("Deleted CV %s for user %s", cv_id, user_id)
+    return {"deleted": True}

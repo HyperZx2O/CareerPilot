@@ -1,3 +1,4 @@
+import os
 import sys
 from datetime import date as date_type, datetime, timedelta, timezone
 from pathlib import Path
@@ -406,16 +407,21 @@ async def generate_goals_endpoint(user = Depends(get_current_user), cv_id: str |
 
     # Fetch CV skills from cv_chunks
     skills_text = ""
-    if cv_id:
-        cv_owner = supabase.table("cvs").select("user_id").eq("id", cv_id).execute()
-        if not cv_owner.data or cv_owner.data[0].get("user_id") != user_id:
-            raise HTTPException(status_code=403, detail="Forbidden: cannot access another user's CV")
-        chunks_result = supabase.table("cv_chunks").select("chunk_text").eq("cv_id", cv_id).eq("section_type", "skills").execute()
-        skills_text = " ".join(c.get("chunk_text", "") for c in chunks_result.data)
+    resolved_cv_id = cv_id
+    if not resolved_cv_id:
+        resolved_cv_id = _resolve_latest_cv_id(supabase, user_id)
+    if resolved_cv_id:
+        db_user_id = _resolve_latest_cv_db_id(supabase, user_id)
+        if db_user_id:
+            cv_owner = supabase.table("cvs").select("user_id").eq("id", resolved_cv_id).execute()
+            if not cv_owner.data or cv_owner.data[0].get("user_id") != db_user_id:
+                raise HTTPException(status_code=403, detail="Forbidden: cannot access another user's CV")
+            chunks_result = supabase.table("cv_chunks").select("chunk_text").eq("cv_id", resolved_cv_id).eq("section_type", "skills").execute()
+            skills_text = " ".join(c.get("chunk_text", "") for c in chunks_result.data)
 
     # If no skills found in cv_chunks, try from Pinecone as fallback
-    if not skills_text:
-        skills_text = _fetch_cv_skills_text(cv_id) or ""
+    if not skills_text and resolved_cv_id:
+        skills_text = _fetch_cv_skills_text(resolved_cv_id) or ""
 
     # If still no skills, use demo/generic skills for development
     if not skills_text:
@@ -437,19 +443,28 @@ async def generate_goals_endpoint(user = Depends(get_current_user), cv_id: str |
     # Insert new goals
     inserted = []
     for g in goals:
-        insert_data = {
+        insert_data: dict = {
             "user_id": user_id,
             "title": g["title"],
             "description": g.get("description", ""),
             "target_role": g.get("target_role", ""),
             "priority": g.get("priority", "medium"),
             "progress": 0,
-            "source": "ai",
         }
 
-        result = supabase.table("goals").insert(insert_data).execute()
+        try:
+            insert_data["source"] = "ai"
+            result = supabase.table("goals").insert(insert_data).execute()
+        except Exception:
+            # Retry without optional columns (e.g. `source` may not exist)
+            insert_data.pop("source", None)
+            try:
+                result = supabase.table("goals").insert(insert_data).execute()
+            except Exception as e:
+                logger.warning("Failed to insert goal: %s", e)
+                continue
+
         if result.data:
-            # Build response with only the fields GoalResponse expects
             goal_data = result.data[0]
             inserted.append(GoalResponse(
                 id=goal_data["id"],
@@ -507,6 +522,29 @@ def _fetch_cv_skills_text(cv_id: str) -> str | None:
     except Exception as e:
         logger.warning("Error fetching CV skills from Pinecone: %s", e)
         return None
+
+
+def _resolve_db_user_id(supabase, auth_user_id: str) -> str | None:
+    """Convert an auth user id (clerk_id) to the internal `users.id` UUID."""
+    try:
+        row = supabase.table("users").select("id").eq("clerk_id", auth_user_id).limit(1).execute()
+        return row.data[0]["id"] if row.data else None
+    except Exception:
+        return None
+
+
+def _resolve_latest_cv_id(supabase, user_id: str) -> str | None:
+    """Find the most recent CV id for the given auth user_id."""
+    try:
+        db_user_id = _resolve_db_user_id(supabase, user_id)
+        if not db_user_id:
+            return None
+        cv_row = supabase.table("cvs").select("id").eq("user_id", db_user_id).order("id", desc=True).limit(1).execute()
+        if cv_row.data:
+            return cv_row.data[0]["id"]
+    except Exception as e:
+        logger.warning("Error resolving latest CV id: %s", e)
+    return None
 
 
 def _compute_streak(user_id: str, user_jwt: str = "") -> int:
@@ -578,8 +616,11 @@ async def get_dashboard_stats(
     # ── Skills count ───────────────────────────────────────────────
     skills_count = 0
     search_query = "software engineer"
-    if cv_id:
-        skills_text_db = _fetch_cv_skills_text(cv_id)
+    resolved_cv_id = cv_id
+    if not resolved_cv_id:
+        resolved_cv_id = _resolve_latest_cv_id(supabase, user_id)
+    if resolved_cv_id:
+        skills_text_db = _fetch_cv_skills_text(resolved_cv_id)
         if skills_text_db:
             skills_count = len(skills_text_db.split())
             tokens = skills_text_db.split()
@@ -655,8 +696,11 @@ async def get_nudge(
 
     # Derive a search query from CV skills
     search_query = "software engineer"  # default fallback
-    if cv_id:
-        skills_text = _fetch_cv_skills_text(cv_id)
+    resolved_cv_id = cv_id
+    if not resolved_cv_id:
+        resolved_cv_id = _resolve_latest_cv_id(supabase, user_id)
+    if resolved_cv_id:
+        skills_text = _fetch_cv_skills_text(resolved_cv_id)
         if skills_text:
             tokens = skills_text.split()
             search_query = " ".join(tokens[:3]) if len(tokens) >= 3 else skills_text

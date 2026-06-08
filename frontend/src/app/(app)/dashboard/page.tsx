@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { getDashboardStats, getNudge } from "@/lib/api";
 import type { DashboardStats, NudgeResponse } from "@/types";
-import { TrendingUp, TrendingDown, Zap, Brain, Flame, Map, ExternalLink } from "lucide-react";
+import { TrendingUp, TrendingDown, Zap, Brain, Flame, Map, ExternalLink, Target, Search, MessageSquare, CheckSquare } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
+import ErrorOverlay from "@/components/ui/ErrorOverlay";
 
 function getUserId(): string {
-  return useAppStore.getState().userId || process.env.NEXT_PUBLIC_DEMO_USER_ID || "demo_user_123";
+  return "demo_user_123";
 }
 
 const containerVariants = {
@@ -159,14 +160,14 @@ function AnimatedNudgeBanner({ nudge }: { nudge: NudgeResponse }) {
 
 function QuickActionCard({
   href,
-  icon,
+  icon: Icon,
   title,
   desc,
   delay,
   color,
 }: {
   href: string;
-  icon: string;
+  icon: LucideIcon;
   title: string;
   desc: string;
   delay: number;
@@ -187,11 +188,11 @@ function QuickActionCard({
       }}
     >
       <motion.div
-        className="flex h-12 w-12 items-center justify-center rounded-xl text-2xl transition-transform group-hover:scale-110"
+        className="flex h-12 w-12 items-center justify-center rounded-xl transition-transform group-hover:scale-110"
         style={{ background: `${color}15` }}
         whileHover={{ rotate: 5 }}
       >
-        {icon}
+        <Icon className="h-6 w-6" style={{ color }} strokeWidth={1.5} />
       </motion.div>
       <div>
         <h3
@@ -229,7 +230,6 @@ export default function DashboardPage() {
   const [nudge, setNudge] = useState<NudgeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const cvId = useAppStore((s) => s.cvId);
   const stats = useAppStore((s) => s.stats);
 
   useEffect(() => {
@@ -237,8 +237,8 @@ export default function DashboardPage() {
       try {
         const uid = getUserId();
         const [s, n] = await Promise.all([
-          getDashboardStats(uid, cvId || undefined),
-          getNudge(uid, cvId || undefined),
+          getDashboardStats(uid),
+          getNudge(uid),
         ]);
         useAppStore.getState().setStats(s);
         setNudge(n);
@@ -246,7 +246,7 @@ export default function DashboardPage() {
       setLoading(false);
     }
     load();
-  }, [cvId]);
+  }, []);
 
   if (loading) {
     return (
@@ -261,28 +261,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (error) {
-    return (
-      <motion.div
-        className="mb-4 flex items-center gap-2 rounded-xl border p-3 text-sm animate-fade-in"
-        style={{
-          borderColor: "var(--cp-danger)",
-          background: "rgba(239, 68, 68, 0.1)",
-          color: "var(--cp-danger)",
-        }}
-      >
-        {error}
-        <motion.button
-          onClick={() => setError(null)}
-          className="ml-auto p-1"
-          whileHover={{ scale: 1.2 }}
-          whileTap={{ scale: 0.9 }}
-        >
-          ✕
-        </motion.button>
-      </motion.div>
-    );
-  }
+
 
   const s = stats;
   const weekDiff = s
@@ -396,7 +375,8 @@ export default function DashboardPage() {
         }}
       >
         <h3 className="mb-4 flex items-center gap-2 font-semibold">
-          🎯 Top Matching Jobs
+          <Target className="h-5 w-5" style={{ color: "var(--cp-primary)" }} />
+          Top Matching Jobs
         </h3>
         {s?.top_jobs && s.top_jobs.length > 0 ? (
           <div className="space-y-3">
@@ -434,7 +414,7 @@ export default function DashboardPage() {
       <motion.div className="grid gap-5 md:grid-cols-3" variants={containerVariants}>
         <QuickActionCard
           href="/jobs"
-          icon="🔍"
+          icon={Search}
           title="Search Jobs"
           desc="Find roles matching your CV"
           delay={0}
@@ -442,7 +422,7 @@ export default function DashboardPage() {
         />
         <QuickActionCard
           href="/chat"
-          icon="💬"
+          icon={MessageSquare}
           title="AI Assistant"
           desc="Career advice grounded in your CV"
           delay={0.1}
@@ -450,13 +430,14 @@ export default function DashboardPage() {
         />
         <QuickActionCard
           href="/tracker"
-          icon="📋"
+          icon={CheckSquare}
           title="Kanban Board"
           desc="Track your applications"
           delay={0.2}
           color="var(--cp-success)"
         />
       </motion.div>
+      <ErrorOverlay error={error} onDismiss={() => setError(null)} />
     </motion.div>
   );
 }

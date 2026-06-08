@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { searchJobs, apiFetch } from "@/lib/api";
 import type { Job } from "@/types";
-import { Search, MapPin, DollarSign, Calendar, ChevronDown, ChevronUp, ExternalLink, Sparkles, FileText } from "lucide-react";
+import { Search, MapPin, DollarSign, Calendar, ChevronDown, ChevronUp, ExternalLink, Sparkles, FileText, AlertTriangle } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 
 function FitBadge({ score }: { score: number | null }) {
@@ -169,7 +169,7 @@ function JobCard({ job, index }: { job: Job; index: number }) {
               className="mb-1 flex items-center gap-1 text-xs font-semibold"
               style={{ color: "var(--cp-warning)" }}
             >
-              ⚠ Gaps
+              <AlertTriangle className="h-3 w-3" /> Gaps
             </p>
             <ul
               className="ml-4 list-disc space-y-0.5 text-xs"
@@ -353,7 +353,6 @@ export default function JobsPage() {
   const [location, setLocation] = useState("bd");
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const cvId = useAppStore((s) => s.cvId);
   const jobs = useAppStore((s) => s.jobs);
   const jobsLoading = useAppStore((s) => s.jobsLoading);
   const setJobs = useAppStore((s) => s.setJobs);
@@ -367,7 +366,9 @@ export default function JobsPage() {
     setJobs([]);
     setError(null);
     try {
-      const results = await searchJobs(query, location, cvId || undefined);
+      // No cv_id — skip Pinecone fit-score. Fit scores are computed
+      // only when viewing a single job's detail.
+      const results = await searchJobs(query, location);
       setJobs(results);
     } catch (err: any) {
       setError(err.message || "Failed to search jobs");
@@ -432,7 +433,7 @@ export default function JobsPage() {
             </div>
           </motion.div>
           <select
-            className="w-full rounded-xl border bg-[var(--cp-surface-2)] px-4 py-3 text-sm outline-none transition-all focus:border-indigo-500 md:w-auto"
+            className="w-full rounded-xl border bg-[var(--cp-surface-2)] px-4 py-3 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 md:w-auto"
             style={{
               borderColor: "var(--cp-border)",
               color: "var(--cp-text)",
@@ -440,11 +441,11 @@ export default function JobsPage() {
             value={location}
             onChange={(e) => setLocation(e.target.value)}
           >
-            <option value="bd">🇧🇩 Bangladesh</option>
-            <option value="gb">🇬🇧 United Kingdom</option>
-            <option value="us">🇺🇸 United States</option>
-            <option value="in">🇮🇳 India</option>
-            <option value="remote">🌐 Remote</option>
+            <option value="bd">BD · Bangladesh</option>
+            <option value="gb">GB · United Kingdom</option>
+            <option value="us">US · United States</option>
+            <option value="in">IN · India</option>
+            <option value="remote">Remote</option>
           </select>
           <motion.button
             type="submit"
@@ -518,12 +519,12 @@ export default function JobsPage() {
           animate={{ opacity: 1, scale: 1 }}
         >
           <motion.div
-            className="mb-4 flex justify-center text-5xl"
+            className="mb-4 flex justify-center"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
           >
-            🔍
+            <Search className="h-12 w-12" style={{ color: "var(--cp-text-dim)" }} strokeWidth={1.5} />
           </motion.div>
           <motion.p
             className="mb-2 text-xl font-semibold"

@@ -1,55 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
-import { ClerkProvider, useAuth, useUser } from "@clerk/nextjs";
-import { useAppStore } from "@/store/useAppStore";
-import { bindAuthTokenAccessor } from "@/lib/api";
-
-function ClerkTokenSync() {
-  const { getToken } = useAuth();
-  const { user } = useUser();
-  const setAuthToken = useAppStore((s) => s.setAuthToken);
-  const setUser = useAppStore((s) => s.setUser);
-
-  // Wire the api.ts token accessor once so every apiFetch call gets the
-  // current Clerk JWT (with localStorage fallback if this hasn't mounted yet).
-  useEffect(() => {
-    bindAuthTokenAccessor(() => useAppStore.getState().authToken);
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      setUser(user.id);
-    }
-  }, [user, setUser]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function sync() {
-      const token = await getToken();
-      if (!cancelled) setAuthToken(token || null);
-    }
-    sync();
-    const interval = setInterval(sync, 60_000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [getToken, setAuthToken]);
-
-  return null;
-}
-
-const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+import { type ReactNode } from "react";
 
 export default function Providers({ children }: { children: ReactNode }) {
-  const inner = children;
-
-  if (!clerkKey) {
-    return inner;
-  }
-
-  return (
-    <ClerkProvider publishableKey={clerkKey}>
-      <ClerkTokenSync />
-      {inner}
-    </ClerkProvider>
-  );
+  return <>{children}</>;
 }

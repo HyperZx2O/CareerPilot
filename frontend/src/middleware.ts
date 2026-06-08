@@ -1,12 +1,9 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-// Minimal middleware: let Clerk set up its request state, do not protect any routes.
-// Page-level <SignedIn>/<SignedOut> guards in the (app) layout handle redirect logic.
-export default clerkMiddleware(() => {
-  // No-op: we deliberately do NOT call auth().protect() here.
-  // Doing so in dev triggers Clerk's `dev-browser-missing` 500 when a request
-  // comes from a non-browser (curl). Public routes pass through unchanged.
-});
+export default function middleware(_req: NextRequest) {
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [

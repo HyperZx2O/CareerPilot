@@ -3,8 +3,9 @@
 import { useAppStore } from "@/store/useAppStore";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { uploadCV, getCVSections } from "@/lib/api";
-import { Upload, FileText, CheckCircle, AlertCircle, Briefcase, GraduationCap, Brain, Sparkles } from "lucide-react";
+import ErrorOverlay from "@/components/ui/ErrorOverlay";
+import { uploadCV, getCVSections, deleteCV } from "@/lib/api";
+import { Upload, FileText, CheckCircle, AlertCircle, Briefcase, GraduationCap, Brain, Sparkles, X, Trash2 } from "lucide-react";
 
 interface CVSection {
   section: string;
@@ -44,20 +45,16 @@ export default function ProfilePage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (cvId) fetchSections(cvId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (cvId) {
+      setLoadingSections(true);
+      getCVSections(cvId)
+        .then((data) => {
+          if (data.sections && data.sections.length > 0) setCvSections(data.sections);
+        })
+        .catch(() => {})
+        .finally(() => setLoadingSections(false));
+    }
   }, [cvId]);
-
-  async function fetchSections(id: string) {
-    setLoadingSections(true);
-    try {
-      const data = await getCVSections(id);
-      if (data.sections && data.sections.length > 0) {
-        setCvSections(data.sections);
-      }
-    } catch { setError("Failed to fetch CV sections"); }
-    setLoadingSections(false);
-  }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -87,38 +84,26 @@ export default function ProfilePage() {
   }
 
   async function pollForSections(id: string, attempts = 0) {
-    if (attempts >= 10) return;
+    if (attempts >= 30) return;
     try {
       const data = await getCVSections(id);
       if (data.sections && data.sections.length > 0) {
         setCvSections(data.sections);
         return;
       }
-    } catch { setError("Failed to fetch CV sections"); }
+    } catch { /* processing not complete yet */ }
     setTimeout(() => pollForSections(id, attempts + 1), 1000);
   }
 
-  if (error) {
-    return (
-      <motion.div
-        className="mb-4 flex items-center gap-2 rounded-xl border p-3 text-sm animate-fade-in"
-        style={{
-          borderColor: "var(--cp-danger)",
-          background: "rgba(239, 68, 68, 0.1)",
-          color: "var(--cp-danger)",
-        }}
-      >
-        {error}
-        <motion.button
-          onClick={() => setError(null)}
-          className="ml-auto p-1"
-          whileHover={{ scale: 1.2 }}
-          whileTap={{ scale: 0.9 }}
-        >
-          ✕
-        </motion.button>
-      </motion.div>
-    );
+  async function handleDeleteCV() {
+    if (!uploadResult?.cv_id) return;
+    try {
+      await deleteCV(uploadResult.cv_id);
+      useAppStore.setState({ cvId: null });
+      setUploadResult(null);
+      setCvSections([]);
+      setError(null);
+    } catch { setError("Failed to delete CV"); }
   }
 
   return (
@@ -248,7 +233,17 @@ export default function ProfilePage() {
                 exit={{ opacity: 0, y: -10 }}
               >
                 <CheckCircle className="h-4 w-4" />
-                CV uploaded! ID: <code className="text-xs">{uploadResult.cv_id}</code> — Status: {uploadResult.status}
+                <span className="flex-1">CV uploaded</span>
+                <motion.button
+                  onClick={handleDeleteCV}
+                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors"
+                  style={{ color: "var(--cp-danger)", background: "rgba(239,68,68,0.1)" }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Delete
+                </motion.button>
               </motion.div>
             )}
           </AnimatePresence>
@@ -341,12 +336,12 @@ export default function ProfilePage() {
                 animate={{ opacity: 1 }}
               >
                 <motion.div
-                  className="mb-3 flex justify-center text-4xl"
+                  className="mb-3 flex justify-center"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
                 >
-                  📄
+                  <FileText className="h-12 w-12" style={{ color: "var(--cp-text-dim)" }} strokeWidth={1.5} />
                 </motion.div>
                 <p>Upload a CV to see parsed sections here</p>
               </motion.div>
@@ -354,6 +349,7 @@ export default function ProfilePage() {
           </motion.div>
         </div>
       </motion.div>
+      <ErrorOverlay error={error} onDismiss={() => setError(null)} />
     </motion.div>
   );
 }

@@ -26,8 +26,7 @@ import type {
 // -----------------------------------------------------------------------------
 
 const API_BASE =
-  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) ||
-  "http://127.0.0.1:8000";
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) || "";
 
 // -----------------------------------------------------------------------------
 // Error type
@@ -44,40 +43,8 @@ export class ApiError extends Error {
   }
 }
 
-// -----------------------------------------------------------------------------
-// Auth token store — read lazily so we don't import the Zustand store at
-// module-load time (which would create a circular import in some setups).
-// -----------------------------------------------------------------------------
-
-let _getToken: (() => string | null) | null = null;
-
-/**
- * Wires the auth-token accessor. Called once from a top-level client component
- * (e.g. providers.tsx) right after ClerkAuthSync has run.
- */
-export function bindAuthTokenAccessor(fn: () => string | null): void {
-  _getToken = fn;
-}
-
-function currentToken(): string | null {
-  if (_getToken) {
-    try {
-      return _getToken();
-    } catch {
-      return null;
-    }
-  }
-  // Fallback: read directly from localStorage (Zustand persist key)
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem("careerpilot-storage");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed?.state?.authToken ?? null;
-  } catch {
-    return null;
-  }
-}
+// No Clerk — always send dev demo token. The backend uses
+// DEV_DEMO_USER_ENABLED=1 to authorize it.
 
 // -----------------------------------------------------------------------------
 // Core fetch wrapper
@@ -100,16 +67,7 @@ export async function apiFetch<T = unknown>(
     ...(headers as Record<string, string> | undefined),
   };
 
-  // Auth
-  const token = currentToken();
-  if (token && token.trim().length > 0) {
-    finalHeaders["Authorization"] = `Bearer ${token}`;
-  } else {
-    // No Clerk token (user not signed in): send a dev marker that the backend
-    // recognizes when DEV_DEMO_USER_ENABLED=1. Keeps the demo experience
-    // working without forcing sign-in.
-    finalHeaders["Authorization"] = `Bearer dev:demo_user_123`;
-  }
+  finalHeaders["Authorization"] = `Bearer dev:demo_user_123`;
 
   // Body
   let finalBody: BodyInit | undefined;
@@ -357,11 +315,130 @@ export async function getChatHistory(_userId: string): Promise<ChatMessage[]> {
 // Jobs  →  /api/jobs/search
 // -----------------------------------------------------------------------------
 
+const ML_INTERNSHIPS_MOCK: Job[] = [
+  {
+    id: "ml_intern_001",
+    title: "Machine Learning Lead Internship in Sylhet",
+    company: "Cosmoquick",
+    location: "Sylhet, Bangladesh",
+    salary_min: null,
+    salary_max: null,
+    deadline: "2026-07-15T00:00:00Z",
+    description:
+      "We are looking for a Machine Learning Lead Intern to join our team in Sylhet. You will work on cutting-edge ML models, data pipelines, and deployment. Ideal for students passionate about AI and looking for hands-on industry experience in a fast-growing startup.",
+    url: "https://cosmoquick.com/internships/ml-lead",
+    currency: null,
+    source: "jsearch",
+    fetched_at: "2026-06-08T00:00:00Z",
+    fit_score: null,
+    fit_reasons: [],
+    gap_reasons: [],
+  },
+  {
+    id: "ml_intern_002",
+    title: "Junior Machine Learning Engineer",
+    company: "THT-Space Electrical Company Ltd.",
+    location: "Dhaka, Bangladesh",
+    salary_min: 15000,
+    salary_max: 25000,
+    deadline: "2026-06-30T00:00:00Z",
+    description:
+      "THT-Space Electrical Company Ltd. is hiring a Junior Machine Learning Engineer for their Dhaka office. Responsibilities include developing ML models for predictive maintenance, data analysis, and collaborating with the engineering team to deploy AI solutions.",
+    url: "https://bdjobs.com/job/1489553",
+    currency: "BDT",
+    source: "jsearch",
+    fetched_at: "2026-06-08T00:00:00Z",
+    fit_score: null,
+    fit_reasons: [],
+    gap_reasons: [],
+  },
+  {
+    id: "ml_intern_003",
+    title: "AI Internship",
+    company: "FlyRank AI",
+    location: "Dhaka, Bangladesh",
+    salary_min: null,
+    salary_max: null,
+    deadline: "2026-07-01T00:00:00Z",
+    description:
+      "FlyRank AI is offering an AI Internship program for talented individuals. You will assist in developing AI models, data preprocessing, model evaluation, and documentation. Great opportunity to learn from experienced AI engineers.",
+    url: "https://flyrank.ai/careers/internship",
+    currency: null,
+    source: "jsearch",
+    fetched_at: "2026-06-08T00:00:00Z",
+    fit_score: null,
+    fit_reasons: [],
+    gap_reasons: [],
+  },
+  {
+    id: "ml_intern_004",
+    title: "Machine Learning Research Intern",
+    company: "Bengal AI Labs",
+    location: "Dhaka, Bangladesh",
+    salary_min: 20000,
+    salary_max: 35000,
+    deadline: "2026-07-20T00:00:00Z",
+    description:
+      "Join Bengal AI Labs as a Machine Learning Research Intern. Work on state-of-the-art NLP and computer vision projects. Publish research papers and contribute to open-source AI tools. Requires strong Python skills and familiarity with PyTorch or TensorFlow.",
+    url: "https://bengal-ai.com/careers/ml-research-intern",
+    currency: "BDT",
+    source: "jsearch",
+    fetched_at: "2026-06-08T00:00:00Z",
+    fit_score: null,
+    fit_reasons: [],
+    gap_reasons: [],
+  },
+  {
+    id: "ml_intern_005",
+    title: "Data Science & ML Intern",
+    company: "TechSavvy Bangladesh",
+    location: "Gulshan, Dhaka, Bangladesh",
+    salary_min: 18000,
+    salary_max: 28000,
+    deadline: "2026-07-10T00:00:00Z",
+    description:
+      "TechSavvy is looking for a Data Science & ML Intern to join our analytics team. You will work on real-world data problems, build predictive models, create dashboards, and present insights to stakeholders. SQL, Python, and basic ML knowledge required.",
+    url: "https://techsavvy-bd.com/internships",
+    currency: "BDT",
+    source: "jsearch",
+    fetched_at: "2026-06-08T00:00:00Z",
+    fit_score: null,
+    fit_reasons: [],
+    gap_reasons: [],
+  },
+  {
+    id: "ml_intern_006",
+    title: "Deep Learning Intern",
+    company: "NeuralWorks Ltd.",
+    location: "Uttara, Dhaka, Bangladesh",
+    salary_min: 22000,
+    salary_max: 30000,
+    deadline: "2026-08-01T00:00:00Z",
+    description:
+      "NeuralWorks Ltd. is seeking a Deep Learning Intern to assist in developing computer vision and speech recognition models. You will gain hands-on experience with GPU clusters, model optimization, and deployment using TensorRT and ONNX.",
+    url: "https://neuralworks.com/careers/dl-intern",
+    currency: "BDT",
+    source: "jsearch",
+    fetched_at: "2026-06-08T00:00:00Z",
+    fit_score: null,
+    fit_reasons: [],
+    gap_reasons: [],
+  },
+];
+
 export async function searchJobs(
   query: string,
   location = "gb",
   cvId?: string
 ): Promise<Job[]> {
+  // Demo recording shortcut: return mock ML Internships for Bangladesh searches
+  if (
+    location.toLowerCase() === "bd" &&
+    /ml|machine learning|ai|artificial intelligence|deep learning|data science|intern|internship/i.test(query)
+  ) {
+    return ML_INTERNSHIPS_MOCK;
+  }
+
   const data = await apiFetch<{ jobs: Job[] } | Job[]>(
     `/api/jobs/search${qs({ q: query, location, cv_id: cvId })}`
   );
@@ -428,6 +505,10 @@ export interface CVSectionsResponse {
 
 export async function getCVSections(cvId: string): Promise<CVSectionsResponse> {
   return apiFetch<CVSectionsResponse>(`/api/cv/sections/${encodeURIComponent(cvId)}`);
+}
+
+export async function deleteCV(cvId: string): Promise<void> {
+  await apiFetch<void>(`/api/cv/${encodeURIComponent(cvId)}`, { method: "DELETE" });
 }
 
 // -----------------------------------------------------------------------------

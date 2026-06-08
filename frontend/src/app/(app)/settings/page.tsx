@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { requestNotificationPermission, getNotificationPermission } from "@/components/providers/ThemeProvider";
+import { Palette, Bell, Bot, CheckCircle, AlertTriangle, Ban, RefreshCw, Save } from "lucide-react";
 
 type NotificationPref = "all" | "important" | "none";
 
@@ -66,7 +67,11 @@ export default function SettingsPage() {
               background: message.type === "success" ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
             }}
           >
-            <span>{message.type === "success" ? "✨" : "⚠️"}</span>
+            {message.type === "success" ? (
+              <CheckCircle className="h-5 w-5 flex-shrink-0" />
+            ) : (
+              <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+            )}
             <p className="font-medium">{message.text}</p>
           </div>
         )}
@@ -74,7 +79,7 @@ export default function SettingsPage() {
         {/* Appearance */}
         <div className="cp-card">
           <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <span>🎨</span> Appearance
+            <Palette className="h-5 w-5" style={{ color: "var(--cp-primary)" }} /> Appearance
           </h2>
           <div className="space-y-4">
             <div>
@@ -95,7 +100,7 @@ export default function SettingsPage() {
         {/* Notifications */}
         <div className="cp-card">
           <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <span>🔔</span> Notifications
+            <Bell className="h-5 w-5" style={{ color: "var(--cp-primary)" }} /> Notifications
           </h2>
           <div className="space-y-4">
             <div>
@@ -111,14 +116,20 @@ export default function SettingsPage() {
                   <option value="none">None</option>
                 </select>
                 <span className="text-xs" style={{ color: "var(--cp-text-dim)" }}>
-                  {notificationStatus === "granted" ? "✅ Enabled" : notificationStatus === "denied" ? "🚫 Blocked" : "⚠️ Not set"}
+                  {notificationStatus === "granted" ? (
+                    <><CheckCircle className="mr-1 inline h-3 w-3" style={{ color: "var(--cp-success)" }} /> Enabled</>
+                  ) : notificationStatus === "denied" ? (
+                    <><Ban className="mr-1 inline h-3 w-3" style={{ color: "var(--cp-danger)" }} /> Blocked</>
+                  ) : (
+                    <><AlertTriangle className="mr-1 inline h-3 w-3" style={{ color: "var(--cp-warning)" }} /> Not set</>
+                  )}
                 </span>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                className={`w-12 h-6 rounded-full transition-colors relative ${settings.weekly_report ? "bg-[var(--cp-primary)]" : "bg-[var(--cp-border)]"}`}
+                className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${settings.weekly_report ? "bg-[var(--cp-primary)]" : "bg-[var(--cp-border)]"}`}
                 onClick={handleToggleWeekly}
               >
                 <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform absolute top-0.5 ${settings.weekly_report ? "translate-x-6" : "translate-x-0.5"}`} />
@@ -135,7 +146,7 @@ export default function SettingsPage() {
         <div className="cp-card">
           <div className="border-b pb-4 mb-4" style={{ borderColor: "var(--cp-border)" }}>
             <h2 className="text-lg font-bold flex items-center gap-2">
-              <span>🤖</span> AI Configuration
+              <Bot className="h-5 w-5" style={{ color: "var(--cp-primary)" }} /> AI Configuration
             </h2>
             <p className="text-xs mt-1" style={{ color: "var(--cp-text-muted)" }}>
               Configure AI providers for the AI Assistant. At least one is recommended for full functionality.
@@ -143,7 +154,7 @@ export default function SettingsPage() {
           </div>
           <div className="grid gap-6 md:grid-cols-2">
             <div>
-              <label className="text-xs font-semibold block mb-1.5">Groq API Key <span className="text-[var(--cp-primary)]">★ Recommended</span></label>
+                <label className="text-xs font-semibold block mb-1.5">Groq API Key <span className="text-[var(--cp-primary)]">Recommended</span></label>
               <input
                 type="password"
                 className="cp-input w-full"
@@ -170,7 +181,7 @@ export default function SettingsPage() {
         {/* Action Button */}
         <div className="flex justify-end">
           <button type="submit" className="cp-btn cp-btn-primary px-8 py-3 font-semibold text-sm" disabled={saving}>
-            {saving ? "🔄 Saving..." : "💾 Save Settings"}
+            {saving ? <><RefreshCw className="mr-1 inline h-4 w-4" /> Saving...</> : <><Save className="mr-1 inline h-4 w-4" /> Save Settings</>}
           </button>
         </div>
       </form>

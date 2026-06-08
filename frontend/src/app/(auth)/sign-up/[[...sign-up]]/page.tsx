@@ -1,17 +1,5 @@
-import { SignUp } from "@clerk/nextjs";
+import { redirect } from "next/navigation";
 
-export default function Page() {
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--cp-bg, #0a0e1a)",
-      }}
-    >
-      <SignUp />
-    </div>
-  );
+export default function SignUpPage() {
+  redirect("/dashboard");
 }

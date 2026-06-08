@@ -15,7 +15,6 @@ import {
   Target,
   LogOut,
 } from "lucide-react";
-import { useUser, useClerk } from "@clerk/nextjs";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -56,7 +55,6 @@ export default function Sidebar() {
           transition={{ type: "spring", stiffness: 300 }}
         >
           <Target className="h-5 w-5 text-white" strokeWidth={2.5} />
-          {/* Glow effect */}
           <motion.div
             className="absolute inset-0 rounded-lg"
             style={{ background: "var(--cp-gradient)" }}
@@ -112,7 +110,6 @@ export default function Sidebar() {
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  {/* Active indicator */}
                   <AnimatePresence>
                     {isActive && (
                       <motion.div
@@ -125,7 +122,6 @@ export default function Sidebar() {
                     )}
                   </AnimatePresence>
 
-                  {/* Icon */}
                   <motion.div
                     className="relative z-10 flex items-center gap-3"
                     whileHover={{ scale: 1.05 }}
@@ -140,7 +136,6 @@ export default function Sidebar() {
                     />
                     <span className="relative z-10">{item.label}</span>
 
-                    {/* Chevron for active state */}
                     <AnimatePresence>
                       {isActive && (
                         <motion.div
@@ -155,7 +150,6 @@ export default function Sidebar() {
                     </AnimatePresence>
                   </motion.div>
 
-                  {/* Hover glow effect */}
                   {!isActive && (
                     <motion.div
                       className="absolute inset-0 rounded-lg opacity-0 transition-opacity"
@@ -192,66 +186,20 @@ export default function Sidebar() {
           </motion.div>
         </Link>
 
-        {/* User avatar section */}
-        <SidebarUser />
+        <div className="mt-4 flex items-center gap-3 rounded-lg px-3 py-2.5"
+          style={{ background: "var(--cp-surface-2)" }}
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
+            style={{ background: "var(--cp-gradient)", color: "white" }}
+          >
+            D
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">Dev Mode</p>
+            <p className="text-xs truncate" style={{ color: "var(--cp-text-dim)" }}>demo_user_123</p>
+          </div>
+        </div>
       </motion.div>
     </motion.aside>
-  );
-}
-
-function SidebarUser() {
-  const { user, isSignedIn } = useUser();
-  const { signOut } = useClerk();
-
-  if (!isSignedIn || !user) {
-    return (
-      <motion.div
-        className="mt-4 flex items-center gap-3 rounded-lg px-3 py-2.5"
-        style={{ background: "var(--cp-surface-2)" }}
-      >
-        <div className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
-          style={{ background: "var(--cp-gradient)", color: "white" }}
-        >
-          U
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">Dev Mode</p>
-          <p className="text-xs truncate" style={{ color: "var(--cp-text-dim)" }}>Demo User</p>
-        </div>
-      </motion.div>
-    );
-  }
-
-  const initial = (user.firstName?.[0] || user.emailAddresses?.[0]?.emailAddress?.[0] || "U").toUpperCase();
-
-  return (
-    <motion.div
-      className="mt-4 flex items-center gap-3 rounded-lg px-3 py-2.5"
-      style={{ background: "var(--cp-surface-2)" }}
-    >
-      <motion.div
-        className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
-        style={{ background: "var(--cp-gradient)", color: "white" }}
-        whileHover={{ scale: 1.1 }}
-      >
-        {initial}
-      </motion.div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{user.firstName || "User"}</p>
-        <p className="text-xs truncate" style={{ color: "var(--cp-text-dim)" }}>
-          {user.primaryEmailAddress?.emailAddress || ""}
-        </p>
-      </div>
-      <motion.button
-        onClick={() => signOut()}
-        className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-red-500/10"
-        style={{ color: "var(--cp-text-dim)" }}
-        whileHover={{ scale: 1.1, color: "var(--cp-danger)" }}
-        whileTap={{ scale: 0.9 }}
-        title="Sign out"
-      >
-        <LogOut className="h-4 w-4" />
-      </motion.button>
-    </motion.div>
   );
 }
