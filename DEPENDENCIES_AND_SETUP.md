@@ -488,16 +488,16 @@ Set environment variables in Vercel Dashboard:
 - `NEXT_PUBLIC_API_URL` → your deployed backend URL
 - All other env vars from `.env.example`
 
-### Backend → Railway (via Nixpacks)
+### Backend → Render (Python Web Service)
 
 ```bash
-# Connect GitHub repo to Railway
-# Railway auto-detects nixpacks.toml in root
-# Set all env vars in Railway Dashboard
+# Connect GitHub repo to Render
+# Render auto-detects requirements.txt & render.yaml in root
+# Set all env vars in Render Dashboard → Environment
 # Deploy triggers on push to main
 ```
 
-Environment variables must be set in the Railway Dashboard matching `.env.example`.
+Environment variables must be set in the Render Dashboard matching `.env.example`.
 
 ### Database → Supabase
 

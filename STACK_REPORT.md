@@ -271,7 +271,7 @@ verifies via Clerk JWKS → extracts `sub` (user ID) → scopes all queries.
 
 ```
 ┌──────────────┐     HTTPS + JWT     ┌──────────────────┐
-│   Vercel      │ ───────────────────→│    Railway        │
+│   Vercel      │ ───────────────────→│    Render          │
 │  (Next.js)    │                     │   (FastAPI)       │
 │  :443         │                     │   :8000           │
 └──────────────┘                     │                  │
@@ -298,7 +298,7 @@ Background task processing is done synchronously or via `asyncio.to_thread()`.
 
 - **Frontend**: Deployed on Vercel (via `vercel deploy`). Build output is static
   export + serverless functions.
-- **Backend**: Deployed on Railway (via Nixpacks + `nixpacks.toml`). Single `uvicorn`
+- **Backend**: Deployed on Render (Python web service via `render.yaml`). Single `uvicorn`
   process handles all requests.
 - **Database**: Supabase managed PostgreSQL.
 - **Vector Store**: Pinecone (serverless index).

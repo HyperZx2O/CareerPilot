@@ -14,7 +14,7 @@ CareerPilot is an AI-first career operating system built as a monorepo with thre
 │  │  Store  │ │  Query   │ │  Auth   │ │   + shadcn   │  │
 │  └────────┘ └──────────┘ └─────────┘ └──────────────┘  │
 ├──────────────────────────────────────────────────────────┤
-│              FastAPI Backend (Railway)                    │
+│              FastAPI Backend (Render)                    │
 │  ┌────────────────┐ ┌──────────────┐ ┌──────────────┐   │
 │  │   REST API     │ │  AI Service  │ │   Tracker    │   │
 │  │  (Routers)     │ │  (RAG/Chat)  │ │  (Kanban)    │   │
@@ -138,7 +138,7 @@ FastAPI → All DB queries scoped by user_id
 
 ```
 ┌─────────────┐     HTTPS      ┌────────────────┐
-│   Vercel     │ ──────────────→│  Railway       │
+│   Vercel     │ ──────────────→│  Render        │
 │   (Next.js)  │   + JWT        │  (FastAPI)     │
 │   :443       │                │  :8000         │
 └─────────────┘                │                │
@@ -186,7 +186,7 @@ FastAPI → All DB queries scoped by user_id
 
 ## 9. Security Measures
 
-- **Transport:** TLS 1.2+ everywhere (Vercel, Railway, Supabase enforce)
+- **Transport:** TLS 1.2+ everywhere (Vercel, Render, Supabase enforce)
 - **Prompt injection:** CV text sanitized before embedding; input length limit 2,000 chars
 - **Data isolation:** All Pinecone queries filtered by `user_id` metadata
 - **CORS:** Configured per environment (wildcard in dev, specific origins in prod)
