@@ -6,7 +6,7 @@ root_path = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(root_path))
 
 from fastapi import APIRouter, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from backend.db.supabase_client import get_supabase_client
 from backend.models.schemas import TodoResponse
 from backend.services.roadmap import generate_roadmap
@@ -18,10 +18,10 @@ router = APIRouter(prefix="/api/roadmap", tags=["Roadmap"])
 
 
 class RoadmapRequest(BaseModel):
-    user_id: str
+    user_id: str = Field(..., min_length=1)
     cv_id: str | None = None
     goal_id: str | None = None
-    target_role: str
+    target_role: str = Field(..., min_length=1, max_length=200)
 
 
 @router.post("/generate", status_code=status.HTTP_201_CREATED)

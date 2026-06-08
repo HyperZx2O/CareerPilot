@@ -353,8 +353,8 @@ export default function JobsPage() {
   const [location, setLocation] = useState("bd");
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const jobs = useAppStore((s) => s.jobs);
-  const jobsLoading = useAppStore((s) => s.jobsLoading);
+  const [localJobs, setLocalJobs] = useState<Job[]>([]);
+  const [localLoading, setLocalLoading] = useState(false);
   const setJobs = useAppStore((s) => s.setJobs);
   const setJobsLoading = useAppStore((s) => s.setJobsLoading);
 
@@ -362,20 +362,22 @@ export default function JobsPage() {
     e.preventDefault();
     if (!query.trim()) return;
     setSearched(true);
-    setJobsLoading(true);
-    setJobs([]);
+    setLocalLoading(true);
+    setLocalJobs([]);
     setError(null);
     try {
-      // No cv_id — skip Pinecone fit-score. Fit scores are computed
-      // only when viewing a single job's detail.
       const results = await searchJobs(query, location);
+      setLocalJobs(results);
       setJobs(results);
     } catch (err: any) {
       setError(err.message || "Failed to search jobs");
+      setLocalJobs([]);
       setJobs([]);
     }
+    setLocalLoading(false);
     setJobsLoading(false);
   }
+
 
   return (
     <motion.div
@@ -403,6 +405,7 @@ export default function JobsPage() {
           Search live jobs with AI-powered fit scores
         </motion.p>
       </motion.div>
+
 
       {/* Search form */}
       <motion.form
@@ -450,11 +453,11 @@ export default function JobsPage() {
           <motion.button
             type="submit"
             className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-shadow hover:shadow-xl disabled:opacity-50"
-            disabled={jobsLoading}
+            disabled={localLoading}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            {jobsLoading ? (
+            {localLoading ? (
               <>
                 <motion.div
                   className="h-4 w-4 rounded-full border-2 border-t-transparent"
@@ -475,7 +478,7 @@ export default function JobsPage() {
       </motion.form>
 
       {/* Error message */}
-      {!jobsLoading && error && (
+      {!localLoading && error && (
         <motion.div
           className="mb-6 rounded-xl border p-4 text-center"
           style={{
@@ -492,7 +495,7 @@ export default function JobsPage() {
       )}
 
       {/* Loading spinner */}
-      {jobsLoading && (
+      {localLoading && (
         <motion.div
           className="flex h-40 items-center justify-center"
           initial={{ opacity: 0 }}
@@ -508,7 +511,7 @@ export default function JobsPage() {
       )}
 
       {/* No jobs found */}
-      {!jobsLoading && !error && searched && jobs.length === 0 && (
+      {!localLoading && !error && searched && localJobs.length === 0 && (
         <motion.div
           className="rounded-2xl border p-12 text-center"
           style={{
@@ -544,7 +547,7 @@ export default function JobsPage() {
         </motion.div>
       )}
 
-      {!jobsLoading && jobs.length > 0 && (
+      {!localLoading && localJobs.length > 0 && (
         <motion.div
           className="grid gap-5 md:grid-cols-2 xl:grid-cols-3"
           initial="hidden"
@@ -556,7 +559,7 @@ export default function JobsPage() {
             },
           }}
         >
-          {jobs.map((job, index) => (
+          {localJobs.map((job, index) => (
             <JobCard key={job.id} job={job} index={index} />
           ))}
         </motion.div>

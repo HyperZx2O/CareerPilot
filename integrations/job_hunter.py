@@ -1,8 +1,9 @@
 import os
 import re
+import logging
 from dotenv import load_dotenv
 
-# Load environment variables at import time only for dotenv integration
+logger = logging.getLogger("job_hunter")
 load_dotenv()
 
 def clean_html(text: str) -> str:
@@ -22,7 +23,7 @@ def search_jsearch(query: str, location: str = "Bangladesh", results: int = 10) 
     """
     JSEARCH_API_KEY = os.getenv("JSEARCH_API_KEY", "")
     if not JSEARCH_API_KEY or "your_" in JSEARCH_API_KEY:
-        print("[JSEARCH] API key not configured")
+        logger.warning("JSearch API key not configured")
         return []
     
     try:
@@ -35,13 +36,13 @@ def search_jsearch(query: str, location: str = "Bangladesh", results: int = 10) 
             "x-api-key": JSEARCH_API_KEY,
         }
         
-        print(f"[JSEARCH] Requesting: {query} in {location}")
+        logger.info("JSearch requesting: %s in %s", query, location)
         import requests
         response = requests.get(url, headers=headers, params=params, timeout=30)
-        print(f"[JSEARCH] Response status: {response.status_code}")
+        logger.info("JSearch response status: %s", response.status_code)
         
         if response.status_code != 200:
-            print(f"[JSEARCH] API error: {response.text[:200]}")
+            logger.warning("JSearch API error: %s", response.text[:200])
             return []
             
         data = response.json()
@@ -65,7 +66,7 @@ def search_jsearch(query: str, location: str = "Bangladesh", results: int = 10) 
             })
         return results_list
     except Exception as e:
-        print(f"[JSEARCH] API call failed: {e}")
+        logger.warning("JSearch API call failed: %s", e)
         return []
 
 # ── Adzuna API (Limited countries) ────────────────────────────────────────────
@@ -100,26 +101,26 @@ def get_bangladesh_jobs(query: str, results: int = 10) -> list[dict]:
     # First try JSearch (openwebninja - supports Bangladesh)
     jobs = search_jsearch(query, "Bangladesh", results)
     if jobs:
-        print(f"[JOB SEARCH] Found {len(jobs)} jobs via JSearch (Bangladesh)")
+        logger.info("Found %s jobs via JSearch (Bangladesh)", len(jobs))
         return jobs
 
     # Next try Adzuna for Bangladesh (bd)
     try:
         jobs = search_adzuna(query, "bd", results)
         if jobs:
-            print(f"[JOB SEARCH] Found {len(jobs)} jobs via Adzuna (bd)")
+            logger.info("Found %s jobs via Adzuna (bd)", len(jobs))
             return jobs
     except Exception as e:
-        print(f"[JOB SEARCH] Adzuna bd call failed: {e}")
+        logger.warning("Adzuna bd call failed: %s", e)
 
     # Fallback to Adzuna GB
     try:
         jobs = search_adzuna(query, "gb", results)
         if jobs:
-            print(f"[JOB SEARCH] Found {len(jobs)} jobs via Adzuna (gb)")
+            logger.info("Found %s jobs via Adzuna (gb)", len(jobs))
             return jobs
     except Exception as e:
-        print(f"[JOB SEARCH] Adzuna gb call failed: {e}")
+        logger.warning("Adzuna gb call failed: %s", e)
 
     # If nothing found, raise to let caller decide (tests expect RuntimeError in some cases)
     raise RuntimeError("Adzuna API call failed or returned no results")
@@ -169,10 +170,10 @@ async def search_jobs_async(query: str, location: str = "bd", results: int = 10)
                 import asyncio
                 jobs = await asyncio.to_thread(search_jsearch, query, "Bangladesh", results)
                 if jobs:
-                    print(f"[JOB SEARCH ASYNC] Found {len(jobs)} jobs via JSearch (Bangladesh)")
+                    logger.info("Async found %s jobs via JSearch (Bangladesh)", len(jobs))
                     return jobs
             except Exception as e:
-                print(f"[JOB SEARCH ASYNC] JSearch call failed: {e}")
+                logger.warning("Async JSearch call failed: %s", e)
 
     # For other countries, or if JSearch failed / was not used, fall back to Adzuna flow
     country = location.lower()[:2] if len(location) >= 2 else "gb"
@@ -207,20 +208,20 @@ async def search_jobs_async(query: str, location: str = "bd", results: int = 10)
             if results_bd:
                 return results_bd
         except Exception as e:
-            print(f"[JOB SEARCH ASYNC] Adzuna bd call failed: {e}")
+            logger.warning("Async Adzuna bd call failed: %s", e)
 
         # fallback to gb
         try:
             return await call_adzuna("gb")
         except Exception as e:
-            print(f"[JOB SEARCH ASYNC] Adzuna gb fallback call failed: {e}")
+            logger.warning("Async Adzuna gb fallback call failed: %s", e)
             return []
 
     # Otherwise try requested country
     try:
         return await call_adzuna(country)
     except Exception as e:
-        print(f"[JOB SEARCH ASYNC] Adzuna async API call failed: {e}")
+        logger.warning("Async Adzuna API call failed: %s", e)
         return []
 
 def parse_job(raw: dict) -> dict:

@@ -2,7 +2,7 @@ import sys
 import asyncio
 from pathlib import Path
 from fastapi import APIRouter, Depends, Query, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 _root_path = Path(__file__).resolve().parent.parent.parent
 _integrations_path = _root_path / "integrations"
@@ -24,9 +24,9 @@ router = APIRouter()
 
 class CoverLetterRequest(BaseModel):
     cv_id: str | None = None
-    job_title: str | None = None
-    company: str | None = None
-    description: str | None = None
+    job_title: str | None = Field(None, min_length=1)
+    company: str | None = Field(None, min_length=1)
+    description: str | None = Field(None, max_length=10000)
 
 async def compute_job_fit_score(cv_id: str, job: dict) -> dict:
     """

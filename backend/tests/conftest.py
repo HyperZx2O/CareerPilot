@@ -235,3 +235,11 @@ def seed_activity_log(fake_supabase: FakeSupabaseClient):
         return row
     return _seed
 
+
+# Ensure dev demo auth is enabled for all tests
+import os
+if "DEV_DEMO_USER_ENABLED" not in os.environ:
+    os.environ["DEV_DEMO_USER_ENABLED"] = "1"
+if "ENV" not in os.environ:
+    os.environ["ENV"] = "test"
+

@@ -135,12 +135,20 @@ temp/
 .netlify/
 .railway/
 
+# AI agent context files
+context/
+
+# TypeScript build info
+*.tsbuildinfo
+
 # Temporary test / scratch files
 tmp_test.py
 check_keys.py
+_*.py
 test_*.py
 frontend/tmp_test.py
 frontend/check_keys.py
+frontend/_*.py
 frontend/test_*.py
 
 # AI agent docs (tracked in repo root for agent context, ignored elsewhere)

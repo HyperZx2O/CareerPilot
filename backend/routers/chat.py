@@ -1,14 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
-from backend.db.supabase_client import get_supabase_client
 from backend.auth import get_current_user, get_supabase_user_client
 from backend.services.rag import retrieve_relevant_chunks, generate_answer
 from backend.logger import get_logger
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = get_logger("chat")
 
 class ChatRequest(BaseModel):
-    content: str
+    content: str = Field(..., min_length=1, max_length=10000)
 
 router = APIRouter()
 

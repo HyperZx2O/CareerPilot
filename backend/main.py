@@ -172,4 +172,4 @@ if __name__ == "__main__":
     import uvicorn
     # Only enable reload in non-production environments
     reload_flag = os.getenv("ENV", "development").lower() != "production"
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=reload_flag)
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=reload_flag)
