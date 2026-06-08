@@ -8,7 +8,6 @@ try {
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
-  output: "standalone",
   env: {
     NEXT_PUBLIC_API_URL: apiUrl,
     NEXT_PUBLIC_DEMO_USER_ID: process.env.NEXT_PUBLIC_DEMO_USER_ID,

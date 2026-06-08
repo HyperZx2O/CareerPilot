@@ -5,7 +5,7 @@ independent components that must be deployed separately:
 
 | Component | Platform | Tech |
 |-----------|----------|------|
-| **Frontend** | Vercel | Next.js 14 (standalone output) |
+| **Frontend** | Vercel | Next.js 14 |
 | **Backend** | Render | FastAPI (Python web service) |
 | **Database** | Supabase | Managed PostgreSQL |
 
