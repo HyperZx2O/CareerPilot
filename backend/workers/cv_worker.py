@@ -21,7 +21,7 @@ def extract_text_from_pdf(pdf_path: str) -> str:
                 text += page_text + "\n"
         return text
     except Exception as e:
-        logger.warning("Error reading PDF with pypdf: %s", e)
+        logger.exception("Error reading PDF with pypdf: %s", e)
         return ""
 
 def segment_cv_text(text: str) -> dict[str, str]:
@@ -172,7 +172,7 @@ def _parse_and_index_cv_sync(cv_id: str, tmp_path: str = None):
                     )]
                 )
             except (ValueError, Exception) as ve:
-                logger.warning("Error upserting segment '%s' to Pinecone: %s. Chunk saved locally only.", sec_name, ve)
+                logger.exception("Error upserting segment '%s' to Pinecone. Chunk saved locally only.", sec_name)
     
     # 5. Batch insert all chunks to Supabase
     if chunks_to_insert:

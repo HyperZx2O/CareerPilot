@@ -1,0 +1,101 @@
+/* Hallmark · macrostructure: Letter · tone: technical · theme: Cobalt
+ * genre: modern-minimal · nav: N5 floating pill · footer: Ft1 minimal
+ * enrichment: none — typography only
+ * axes: paper=light(>85%) · display=grotesk-sans · accent=cool(256°)
+ *
+ * Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5
+ */
+
+:root {
+  /* ── Paper (cool engineered white, hue ~250) ── */
+  --color-paper: oklch(0.985 0.004 250);
+  --color-paper-2: oklch(0.95 0.006 250);
+  --color-paper-3: oklch(0.91 0.008 250);
+
+  /* ── Text (cool charcoal, hue ~258) ── */
+  --color-text: oklch(0.22 0.018 258);
+  --color-text-muted: oklch(0.42 0.015 255);
+  --color-text-dim: oklch(0.62 0.012 252);
+
+  /* ── Accent — Electric Cobalt (one signal, <5% viewport) ── */
+  --color-accent: oklch(0.58 0.20 256);
+  --color-accent-hover: oklch(0.54 0.22 256);
+  --color-accent-subtle: oklch(0.58 0.20 256 / 0.08);
+  --color-accent-glow: oklch(0.58 0.20 256 / 0.15);
+
+  /* ── Border (hairlines do the work) ── */
+  --color-border: oklch(0.86 0.008 252);
+  --color-border-hover: oklch(0.78 0.012 252);
+
+  /* ── Graphite (one dark band — code/terminal cards) ── */
+  --color-graphite: oklch(0.22 0.016 260);
+  --color-graphite-text: oklch(0.88 0.008 258);
+
+  /* ── Feedback ── */
+  --color-focus: oklch(0.58 0.20 256);
+  --color-success: oklch(0.62 0.18 145);
+  --color-error: oklch(0.55 0.19 28);
+
+  /* ── Fonts ── */
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* ── Spacing (4 pt scale) ── */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+  --space-4xl: 96px;
+  --space-5xl: 128px;
+
+  /* ── Text scale ── */
+  --text-display: clamp(2.75rem, 5.5vw, 4.25rem);
+  --text-display-s: clamp(2rem, 3.5vw, 2.75rem);
+  --text-h1: clamp(1.75rem, 3vw, 2.5rem);
+  --text-h2: clamp(1.35rem, 2.2vw, 1.75rem);
+  --text-h3: 1.2rem;
+  --text-body: 1.0625rem;
+  --text-body-s: 0.9375rem;
+  --text-sm: 0.85rem;
+  --text-xs: 0.75rem;
+
+  /* ── Motion ── */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 150ms;
+  --dur-normal: 300ms;
+  --dur-slow: 500ms;
+
+  /* ── Radii (tight/technical — drawn with a ruler) ── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* ── Rule ── */
+  --rule: 1px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: oklch(0.14 0.012 255);
+    --color-paper-2: oklch(0.18 0.014 255);
+    --color-paper-3: oklch(0.22 0.016 255);
+    --color-text: oklch(0.94 0.006 258);
+    --color-text-muted: oklch(0.68 0.008 255);
+    --color-text-dim: oklch(0.50 0.01 252);
+    --color-accent: oklch(0.65 0.16 256);
+    --color-accent-hover: oklch(0.70 0.14 256);
+    --color-accent-subtle: oklch(0.65 0.16 256 / 0.12);
+    --color-accent-glow: oklch(0.65 0.16 256 / 0.2);
+     --color-border: oklch(0.28 0.014 255);
+     --color-border-hover: oklch(0.36 0.016 255);
+     --color-graphite: oklch(0.22 0.016 260);
+     --color-graphite-text: oklch(0.88 0.008 258);
+  }
+}

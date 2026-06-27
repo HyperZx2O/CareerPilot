@@ -1,228 +1,164 @@
+/* Hallmark · genre: modern-minimal · macrostructure: Workbench · design-system: design.md · designed-as-app
+ * nav: N3 side-rail (sidebar) · theme: Cobalt
+ * section heads: S2 hanging · stat strip: T4 · CTA: C3 typographic
+ */
 "use client";
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { getDashboardStats, getNudge } from "@/lib/api";
-import type { DashboardStats, NudgeResponse } from "@/types";
-import { TrendingUp, TrendingDown, Zap, Brain, Flame, Map, ExternalLink, Target, Search, MessageSquare, CheckSquare } from "lucide-react";
+import type { NudgeResponse } from "@/types";
+import { TrendingUp, TrendingDown, Zap, Brain, Flame, Map, ExternalLink, Search, MessageSquare, CheckSquare } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import ErrorOverlay from "@/components/ui/ErrorOverlay";
 
-function getUserId(): string {
-  return "demo_user_123";
-}
+function StatStrip({ stats }: { stats: NonNullable<ReturnType<typeof useAppStore.getState>['stats']> }) {
+  const items = [
+    { label: "Applications", value: stats.applications_this_week, icon: Zap, sub: stats.applications_last_week },
+    { label: "Skills", value: stats.skills_count, icon: Brain },
+    { label: "Streak", value: `${stats.streak_days}d`, icon: Flame },
+    { label: "Progress", value: `${stats.roadmap_progress}%`, icon: Map },
+  ];
 
-const containerVariants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 },
-};
-
-function AnimatedStatCard({
-  label,
-  value,
-  sub,
-  icon: Icon,
-  delay = 0,
-  color = "var(--cp-primary)",
-}: {
-  label: string;
-  value: string | number;
-  sub?: string;
-  icon: LucideIcon;
-  delay?: number;
-  color?: string;
-}) {
   return (
-    <motion.div
-      variants={itemVariants}
-      className="group relative overflow-hidden rounded-2xl border p-5 transition-all hover:shadow-lg cursor-pointer"
-      style={{
-        background: "var(--cp-surface)",
-        borderColor: "var(--cp-border)",
-      }}
-      whileHover={{
-        scale: 1.02,
-        borderColor: "var(--cp-border-hover)",
-        transition: { duration: 0.2 },
-      }}
-    >
-      {/* Gradient glow on hover */}
-      <motion.div
-        className="absolute -right-10 -top-10 h-32 w-32 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-10"
-        style={{ background: color }}
-      />
-
-      <div className="flex items-start justify-between relative z-10">
-        <div>
-          <p className="text-sm mb-1" style={{ color: "var(--cp-text-muted)" }}>
-            {label}
-          </p>
-          <motion.p
-            className="text-3xl font-bold"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: delay + 0.2 }}
-          >
-            {value}
-          </motion.p>
-          {sub && (
-            <motion.p
-              className="text-xs mt-1 flex items-center gap-1"
-              style={{ color: "var(--cp-text-dim)" }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: delay + 0.3 }}
+    <div className="stat-strip tnum mb-8 grid grid-cols-2 gap-px overflow-hidden rounded-xl border sm:grid-cols-4" style={{ borderColor: "var(--color-border)" }}>
+      {items.map((item, i) => {
+        const weekDiff = item.sub !== undefined ? item.value - (item.sub as number) : null;
+        return (
+          <div key={item.label} className="flex flex-col items-center justify-center px-4 py-5 text-center" style={{ background: "var(--color-paper)" }}>
+            <item.icon className="mb-2 h-5 w-5" style={{ color: "var(--color-accent)" }} strokeWidth={1.5} />
+            <motion.span
+              className="text-2xl font-bold leading-none"
+              style={{ color: "var(--color-text)" }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08 }}
             >
-              {sub.includes("↑") || sub.includes("↓") ? (
-                <>
-                  {sub.includes("↑") ? (
-                    <TrendingUp className="h-3 w-3 text-emerald-400" />
-                  ) : (
-                    <TrendingDown className="h-3 w-3 text-red-400" />
-                  )}
-                </>
-              ) : null}
-              {sub}
-            </motion.p>
-          )}
-        </div>
-        <motion.div
-          className="flex h-12 w-12 items-center justify-center rounded-xl transition-transform group-hover:scale-110"
-          style={{ background: `${color}20` }}
-          whileHover={{ rotate: 5 }}
-        >
-          <Icon className="h-6 w-6" style={{ color }} strokeWidth={1.5} />
-        </motion.div>
-      </div>
-    </motion.div>
+              {item.value}
+            </motion.span>
+            <span className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>{item.label}</span>
+            {weekDiff !== null && (
+              <span className="mt-0.5 flex items-center gap-0.5 text-[10px]" style={{ color: weekDiff >= 0 ? "var(--color-success)" : "var(--color-accent)" }}>
+                {weekDiff >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                {Math.abs(weekDiff)}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
-function AnimatedNudgeBanner({ nudge }: { nudge: NudgeResponse }) {
+function RoadmapSection({ progress }: { progress: number }) {
+  return (
+    <div className="rounded-xl border p-5" style={{ background: "var(--color-paper)", borderColor: "var(--color-border)" }}>
+      <header className="head-hang mb-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Learning Roadmap</h2>
+      </header>
+      <div className="mb-2 flex items-center justify-between text-sm">
+        <span style={{ color: "var(--color-text-dim)" }}>Overall progress</span>
+        <span className="font-semibold tabular-nums" style={{ color: "var(--color-accent)" }}>{progress}%</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full" style={{ background: "var(--color-paper-2)" }}>
+        <motion.div
+          className="h-full rounded-full"
+          style={{ background: "var(--color-accent)" }}
+          initial={{ width: 0 }}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function NudgeInline({ nudge }: { nudge: NudgeResponse }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: -20, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
-      className="relative mb-6 overflow-hidden rounded-2xl border p-5"
+      className="rounded-xl border p-4 text-sm"
       style={{
-        background: "linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%)",
-        borderColor: "rgba(245, 158, 11, 0.3)",
+        background: "color-mix(in srgb, var(--color-accent) 6%, var(--color-paper))",
+        borderColor: "color-mix(in srgb, var(--color-accent) 20%, var(--color-border))",
       }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
     >
-      {/* Animated pulse border */}
-      <motion.div
-        className="absolute inset-0 rounded-2xl"
-        style={{
-          border: "2px solid",
-          borderColor: "var(--cp-warning)",
-        }}
-        animate={{
-          opacity: [0.5, 1, 0.5],
-          scale: [1, 1.01, 1],
-        }}
-        transition={{ duration: 2, repeat: Infinity }}
-      />
-
-      <div className="relative flex items-center gap-4">
-        <motion.div
-          className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/20"
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-        >
-          <Zap className="h-6 w-6 text-amber-400" />
-        </motion.div>
-        <div className="flex-1">
-          <p className="font-semibold">{nudge.message}</p>
+      <div className="flex items-start gap-3">
+        <Zap className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--color-accent)" }} />
+        <div>
+          <p className="font-medium" style={{ color: "var(--color-text)" }}>{nudge.message}</p>
           {nudge.jobs.length > 0 && (
-            <p className="text-sm mt-1" style={{ color: "var(--cp-text-muted)" }}>
+            <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
               {nudge.jobs.map((j) => j.title).join(", ")}
             </p>
           )}
         </div>
-        <motion.button
-          className="rounded-lg bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-400 hover:bg-amber-500/30 transition-colors"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          View Jobs
-        </motion.button>
       </div>
     </motion.div>
   );
 }
 
-function QuickActionCard({
-  href,
-  icon: Icon,
-  title,
-  desc,
-  delay,
-  color,
-}: {
-  href: string;
-  icon: LucideIcon;
-  title: string;
-  desc: string;
-  delay: number;
-  color: string;
-}) {
+function TopJobsList({ jobs }: { jobs: Array<{ title: string; company: string; location: string; url: string }> }) {
   return (
-    <motion.a
-      href={href}
-      variants={itemVariants}
-      className="group flex items-center gap-4 rounded-2xl border p-5 transition-all hover:shadow-lg"
-      style={{
-        background: "var(--cp-surface)",
-        borderColor: "var(--cp-border)",
-      }}
-      whileHover={{
-        scale: 1.02,
-        borderColor: "var(--cp-border-hover)",
-      }}
-    >
-      <motion.div
-        className="flex h-12 w-12 items-center justify-center rounded-xl transition-transform group-hover:scale-110"
-        style={{ background: `${color}15` }}
-        whileHover={{ rotate: 5 }}
-      >
-        <Icon className="h-6 w-6" style={{ color }} strokeWidth={1.5} />
-      </motion.div>
-      <div>
-        <h3
-          className="font-semibold transition-colors"
-          style={{ color: "var(--cp-text)" }}
-        >
-          {title}
-        </h3>
-        <p
-          className="text-sm"
-          style={{ color: "var(--cp-text-dim)" }}
-        >
-          {desc}
-        </p>
+    <div className="rounded-xl border p-5" style={{ background: "var(--color-paper)", borderColor: "var(--color-border)" }}>
+      <header className="head-hang mb-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Top Matches</h2>
+      </header>
+      <div className="space-y-2">
+        {jobs.map((job, i) => (
+          <motion.a
+            key={i}
+            href={job.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between rounded-xl px-3 py-2.5 transition-all"
+            style={{ background: "var(--color-paper-2)" }}
+            whileHover={{ background: "color-mix(in srgb, var(--color-accent) 8%, var(--color-paper-2))" }}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium" style={{ color: "var(--color-text)" }}>{job.title}</p>
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{job.company} · {job.location}</p>
+            </div>
+            <ExternalLink className="ml-3 h-4 w-4 shrink-0" style={{ color: "var(--color-text-dim)" }} />
+          </motion.a>
+        ))}
       </div>
-      <motion.svg
-        className="ml-auto h-5 w-5 opacity-0 transition-opacity group-hover:opacity-100"
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={{ color: "var(--cp-text-muted)" }}
-      >
-        <path d="M5 12h14" />
-        <path d="m12 5 7 7-7 7" />
-      </motion.svg>
-    </motion.a>
+      {jobs.length > 0 && (
+        <div className="mt-4 border-t pt-3 text-center" style={{ borderColor: "var(--color-border)" }}>
+          <a href="/jobs" className="link text-sm" style={{ color: "var(--color-accent)" }}>
+            View all jobs →
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActionDock() {
+  const actions = [
+    { href: "/jobs", icon: Search, label: "Search Jobs", desc: "Find roles matching your CV" },
+    { href: "/chat", icon: MessageSquare, label: "AI Assistant", desc: "Career advice grounded in your CV" },
+    { href: "/tracker", icon: CheckSquare, label: "Kanban Board", desc: "Track your applications" },
+  ];
+
+  return (
+    <div className="mt-8 grid grid-cols-3 gap-px overflow-hidden rounded-xl border" style={{ borderColor: "var(--color-border)" }}>
+      {actions.map((a) => (
+        <motion.a
+          key={a.href}
+          href={a.href}
+          className="flex flex-col items-center gap-1.5 px-4 py-5 text-center transition-all"
+          style={{ background: "var(--color-paper)" }}
+          whileHover={{ background: "color-mix(in srgb, var(--color-accent) 6%, var(--color-paper))" }}
+        >
+          <a.icon className="h-5 w-5" style={{ color: "var(--color-accent)" }} strokeWidth={1.5} />
+          <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>{a.label}</span>
+          <span className="text-[11px]" style={{ color: "var(--color-text-dim)" }}>{a.desc}</span>
+        </motion.a>
+      ))}
+    </div>
   );
 }
 
@@ -235,10 +171,9 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       try {
-        const uid = getUserId();
         const [s, n] = await Promise.all([
-          getDashboardStats(uid),
-          getNudge(uid),
+          getDashboardStats(),
+          getNudge(),
         ]);
         useAppStore.getState().setStats(s);
         setNudge(n);
@@ -252,8 +187,8 @@ export default function DashboardPage() {
     return (
       <div className="flex h-96 items-center justify-center">
         <motion.div
-          className="h-12 w-12 rounded-full border-4 border-t-transparent"
-          style={{ borderColor: "var(--cp-primary)", borderTopColor: "transparent" }}
+          className="h-8 w-8 rounded-full border-2"
+          style={{ borderColor: "var(--color-border)", borderTopColor: "var(--color-accent)" }}
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
         />
@@ -261,182 +196,42 @@ export default function DashboardPage() {
     );
   }
 
-
-
   const s = stats;
-  const weekDiff = s
-    ? s.applications_this_week - s.applications_last_week
-    : 0;
-  const weekTrend =
-    weekDiff >= 0
-      ? `↑ ${weekDiff} from last week`
-      : `↓ ${Math.abs(weekDiff)} from last week`;
 
   return (
     <motion.div
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
     >
-      <motion.div className="mb-8" variants={itemVariants}>
-        <motion.h1
-          className="text-3xl font-bold mb-1"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4 }}
-        >
+      <div className="mb-6">
+        <h1 className="text-2xl" style={{ fontFamily: "var(--font-display)", color: "var(--color-text)" }}>
           Dashboard
-        </motion.h1>
-        <motion.p
-          style={{ color: "var(--cp-text-muted)" }}
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
-        >
+        </h1>
+        <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>
           Your career at a glance
-        </motion.p>
-      </motion.div>
+        </p>
+      </div>
 
-      {/* Nudge banner */}
-      {nudge?.message && <AnimatedNudgeBanner nudge={nudge} />}
+      {stats && <StatStrip stats={stats} />}
 
-      {/* Stat cards */}
-      <motion.div
-        className="grid gap-5 md:grid-cols-2 lg:grid-cols-4 mb-8"
-        variants={containerVariants}
-      >
-        <AnimatedStatCard
-          label="Applications This Week"
-          value={s?.applications_this_week ?? "—"}
-          sub={s ? weekTrend : "No data yet"}
-          icon={Zap}
-          delay={0}
-          color="var(--cp-primary)"
-        />
-        <AnimatedStatCard
-          label="Skills Detected"
-          value={s?.skills_count ?? "—"}
-          icon={Brain}
-          delay={0.1}
-          color="var(--cp-accent)"
-        />
-        <AnimatedStatCard
-          label="Streak"
-          value={s ? `${s.streak_days} days` : "—"}
-          icon={Flame}
-          delay={0.2}
-          color="var(--cp-warning)"
-        />
-        <AnimatedStatCard
-          label="Roadmap Progress"
-          value={s ? `${s.roadmap_progress}%` : "—"}
-          icon={Map}
-          delay={0.3}
-          color="var(--cp-success)"
-        />
-      </motion.div>
-
-      {/* Roadmap progress bar */}
-      <motion.div
-        variants={itemVariants}
-        className="mb-8 overflow-hidden rounded-2xl border p-5"
-        style={{
-          background: "var(--cp-surface)",
-          borderColor: "var(--cp-border)",
-        }}
-      >
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold">Learning Roadmap</h3>
-          <span
-            className="text-sm font-semibold"
-            style={{ color: "var(--cp-accent)" }}
-          >
-            {s?.roadmap_progress ?? 0}%
-          </span>
+      <div className="mb-8 grid gap-5 lg:grid-cols-2">
+        <div className="space-y-4">
+          <RoadmapSection progress={s?.roadmap_progress ?? 0} />
+          {nudge?.message && <NudgeInline nudge={nudge} />}
         </div>
-        <div className="h-3 w-full overflow-hidden rounded-full" style={{ background: "var(--cp-surface-2)" }}>
-          <motion.div
-            className="h-full rounded-full"
-            style={{ background: "var(--cp-gradient)" }}
-            initial={{ width: 0 }}
-            animate={{ width: `${s?.roadmap_progress ?? 0}%` }}
-            transition={{ duration: 1, delay: 0.5, ease: "easeOut" }}
-          />
+        <div>
+          {s?.top_jobs && s.top_jobs.length > 0 ? (
+            <TopJobsList jobs={s.top_jobs} />
+          ) : (
+            <div className="flex h-full items-center justify-center rounded-xl border" style={{ background: "var(--color-paper)", borderColor: "var(--color-border)" }}>
+              <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>No matching jobs found</p>
+            </div>
+          )}
         </div>
-      </motion.div>
+      </div>
 
-      {/* Top Matching Jobs */}
-      <motion.div
-        variants={itemVariants}
-        className="mb-8 overflow-hidden rounded-2xl border p-5"
-        style={{
-          background: "var(--cp-surface)",
-          borderColor: "var(--cp-border)",
-        }}
-      >
-        <h3 className="mb-4 flex items-center gap-2 font-semibold">
-          <Target className="h-5 w-5" style={{ color: "var(--cp-primary)" }} />
-          Top Matching Jobs
-        </h3>
-        {s?.top_jobs && s.top_jobs.length > 0 ? (
-          <div className="space-y-3">
-            {s.top_jobs.map((job, i) => (
-              <motion.a
-                key={i}
-                href={job.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between rounded-xl border p-3 transition-all hover:shadow-md"
-                style={{ borderColor: "var(--cp-border)" }}
-                whileHover={{ scale: 1.01, borderColor: "var(--cp-border-hover)" }}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{job.title}</p>
-                  <p className="text-xs" style={{ color: "var(--cp-text-muted)" }}>
-                    {job.company} · {job.location}
-                  </p>
-                </div>
-                <ExternalLink
-                  className="ml-3 h-4 w-4 flex-shrink-0"
-                  style={{ color: "var(--cp-text-dim)" }}
-                />
-              </motion.a>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm" style={{ color: "var(--cp-text-dim)" }}>
-            No matching jobs found
-          </p>
-        )}
-      </motion.div>
-
-      {/* Quick actions */}
-      <motion.div className="grid gap-5 md:grid-cols-3" variants={containerVariants}>
-        <QuickActionCard
-          href="/jobs"
-          icon={Search}
-          title="Search Jobs"
-          desc="Find roles matching your CV"
-          delay={0}
-          color="var(--cp-primary)"
-        />
-        <QuickActionCard
-          href="/chat"
-          icon={MessageSquare}
-          title="AI Assistant"
-          desc="Career advice grounded in your CV"
-          delay={0.1}
-          color="var(--cp-accent)"
-        />
-        <QuickActionCard
-          href="/tracker"
-          icon={CheckSquare}
-          title="Kanban Board"
-          desc="Track your applications"
-          delay={0.2}
-          color="var(--cp-success)"
-        />
-      </motion.div>
+      <ActionDock />
       <ErrorOverlay error={error} onDismiss={() => setError(null)} />
     </motion.div>
   );

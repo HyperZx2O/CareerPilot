@@ -9,23 +9,35 @@ if not exist ".env" (
 )
 
 echo ============================================
-echo  CareerPilot — Starting Backend + Frontend
+echo  CareerPilot — Starting all services
 echo ============================================
 echo.
 
-echo [1/2] Starting Backend (FastAPI :8000)...
-start "CareerPilot-Backend" cmd /c "uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000"
+:: --- Ngrok tunnel ---
+where ngrok >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [1/3] Starting Ngrok tunnel...
+    start "CareerPilot-Ngrok" cmd /c "ngrok http 8000 --log=stdout"
+    timeout /t 3 /nobreak >nul
+) else (
+    echo [1/3] Ngrok not found — skipping tunnel. Webhooks won't reach localhost.
+)
 
-timeout /t 4 /nobreak >nul
+:: --- Backend (auto-restart on crash via infinite for /l loop) ---
+echo [2/3] Starting Backend (FastAPI :8000)...
+start "CareerPilot-Backend" cmd /c "for /l %%x in (1,0,2) do (python -m backend.main & echo [%DATE% %TIME%] Backend crashed, restarting... & timeout /t 3 /nobreak >nul)"
 
-echo [2/2] Starting Frontend (Next.js :3000)...
-start "CareerPilot-Frontend" cmd /c "cd /d "%~dp0frontend" && npm run dev"
+timeout /t 5 /nobreak >nul
+
+:: --- Frontend (auto-restart on crash via infinite for /l loop) ---
+echo [3/3] Starting Frontend (Next.js :3000)...
+start "CareerPilot-Frontend" cmd /c "for /l %%x in (1,0,2) do (cd /d "%~dp0frontend" && npm run dev & echo [%DATE% %TIME%] Frontend crashed, restarting... & timeout /t 3 /nobreak >nul)"
 
 echo.
-echo Both servers should be starting up.
+echo All services starting up:
 echo   Backend  -> http://localhost:8000
 echo   Frontend -> http://localhost:3000
 echo.
-echo Close the server windows to stop, or press Ctrl+C here.
+echo Each service runs in its own window with auto-restart.
+echo Close its window to stop that service.
 echo ============================================
-pause

@@ -12,7 +12,7 @@ logger = get_logger("auth")
 
 JWKS_URL = os.getenv("CLERK_JWKS_URL", "https://api.clerk.dev/v1/jwks")
 
-_allowed_jwks_domains = {"api.clerk.dev", "clerk.com"}
+_allowed_jwks_domains = {"api.clerk.dev", "clerk.com", "clerk.accounts.dev"}
 
 def _validate_jwks_url(url: str) -> str:
     parsed = urlparse(url)
@@ -40,11 +40,12 @@ def verify_jwt(token: str):
         if not key:
             raise HTTPException(status_code=401, detail="Invalid token")
         expected_issuer = os.getenv("CLERK_ISSUER", "https://api.clerk.dev")
+        expected_audience = os.getenv("CLERK_AUDIENCE") or None
         return jwt.decode(
             token,
             key,
             algorithms=["RS256"],
-            audience=os.getenv("CLERK_AUDIENCE"),
+            audience=expected_audience,
             issuer=expected_issuer,
         )
     except HTTPException:
@@ -86,8 +87,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(
         raise HTTPException(status_code=401, detail="Authentication required")
 
     token = credentials.credentials
-    payload = verify_jwt(token)
-    return AuthUser(id=payload.get("sub", ""), email=payload.get("email", ""), jwt=token)
+    try:
+        payload = verify_jwt(token)
+        return AuthUser(id=payload.get("sub", ""), email=payload.get("email", ""), jwt=token)
+    except HTTPException:
+        if env != "production" and dev_demo_enabled:
+            logger.info("JWT verification failed — falling back to demo user (dev mode)")
+            return AuthUser(id="demo_user_123", email="demo@careerpilot.ai", jwt=None)
+        raise
 
 
 async def get_user_supabase_client(user: AuthUser = Depends(get_current_user)):

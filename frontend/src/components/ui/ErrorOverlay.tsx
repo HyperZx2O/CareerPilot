@@ -23,9 +23,9 @@ export default function ErrorOverlay({ error, onDismiss }: ErrorOverlayProps) {
           <motion.div
             className="relative w-full max-w-md overflow-hidden rounded-2xl border p-6 backdrop-blur-xl"
             style={{
-              background: "rgba(15,15,25,0.85)",
-              borderColor: "rgba(239,68,68,0.3)",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+              background: "color-mix(in srgb, var(--color-paper) 95%, transparent)",
+              borderColor: "color-mix(in srgb, var(--color-accent) 30%, var(--color-border))",
+              boxShadow: "0 8px 32px color-mix(in srgb, var(--color-accent) 15%, transparent)",
             }}
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -35,16 +35,16 @@ export default function ErrorOverlay({ error, onDismiss }: ErrorOverlayProps) {
             <div className="flex items-start gap-3">
               <motion.div
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-                style={{ background: "rgba(239,68,68,0.15)" }}
+                style={{ background: "color-mix(in srgb, var(--color-accent) 15%, transparent)" }}
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.1, type: "spring", stiffness: 300 }}
               >
-                <AlertTriangle className="h-5 w-5" style={{ color: "var(--cp-danger)" }} />
+                <AlertTriangle className="h-5 w-5" style={{ color: "var(--color-accent)" }} />
               </motion.div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold">Something went wrong</p>
-                <p className="mt-1 text-sm" style={{ color: "var(--cp-text-muted)" }}>{error}</p>
+                <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>{error}</p>
               </div>
               <motion.button
                 onClick={onDismiss}

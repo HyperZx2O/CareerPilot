@@ -20,6 +20,7 @@ import type {
   NudgeResponse,
   CV,
 } from "@/types";
+import { useAppStore } from "@/store/useAppStore";
 
 // -----------------------------------------------------------------------------
 // Configuration
@@ -43,8 +44,12 @@ export class ApiError extends Error {
   }
 }
 
-// No Clerk — always send dev demo token. The backend uses
-// DEV_DEMO_USER_ENABLED=1 to authorize it.
+// ponytail: no Clerk token falls back to dev demo token for local dev
+function getAuthToken(): string {
+  const token = useAppStore.getState().authToken;
+  if (!token) return `Bearer dev:demo_user_123`;
+  return token.startsWith("Bearer ") ? token : `Bearer ${token}`;
+}
 
 // -----------------------------------------------------------------------------
 // Core fetch wrapper
@@ -67,7 +72,7 @@ export async function apiFetch<T = unknown>(
     ...(headers as Record<string, string> | undefined),
   };
 
-  finalHeaders["Authorization"] = `Bearer dev:demo_user_123`;
+  finalHeaders["Authorization"] = getAuthToken();
 
   // Body
   let finalBody: BodyInit | undefined;
@@ -82,19 +87,24 @@ export async function apiFetch<T = unknown>(
 
   const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 45000);
+
   let res: Response;
   try {
     res = await fetch(url, {
       ...rest,
       headers: finalHeaders,
       body: finalBody,
+      signal: controller.signal,
     });
   } catch (err) {
-    // Network failure (server down, CORS, offline)
+    clearTimeout(timeoutId);
     const message =
       err instanceof Error ? err.message : "Network request failed";
     throw new ApiError(0, `Network error: ${message}`);
   }
+  clearTimeout(timeoutId);
 
   // 204 No Content
   if (res.status === 204) {
@@ -146,7 +156,7 @@ function qs(params: Record<string, string | number | boolean | null | undefined>
 // Todos  →  /api/tracker/todos
 // -----------------------------------------------------------------------------
 
-export async function getTodos(userId: string, date?: string): Promise<Todo[]> {
+export async function getTodos(userId?: string, date?: string): Promise<Todo[]> {
   const data = await apiFetch<{ todos: Todo[] } | Todo[]>(
     `/api/tracker/todos${qs({ user_id: userId, date })}`
   );
@@ -185,7 +195,7 @@ export async function deleteTodo(id: string): Promise<void> {
 // Goals  →  /api/tracker/goals
 // -----------------------------------------------------------------------------
 
-export async function getGoals(userId: string): Promise<Goal[]> {
+export async function getGoals(userId?: string): Promise<Goal[]> {
   const data = await apiFetch<{ goals: Goal[] } | Goal[]>(
     `/api/tracker/goals${qs({ user_id: userId })}`
   );
@@ -221,7 +231,7 @@ export async function deleteGoal(id: string): Promise<void> {
   });
 }
 
-export async function generateGoals(userId: string, cvId?: string): Promise<{
+export async function generateGoals(userId?: string, cvId?: string): Promise<{
   goals: Goal[];
   message: string;
 }> {
@@ -234,7 +244,7 @@ export async function generateGoals(userId: string, cvId?: string): Promise<{
 // Applications (Kanban)  →  /api/tracker/applications
 // -----------------------------------------------------------------------------
 
-export async function getApplications(userId: string): Promise<Application[]> {
+export async function getApplications(userId?: string): Promise<Application[]> {
   const data = await apiFetch<{ applications: Application[] } | Application[]>(
     `/api/tracker/applications${qs({ user_id: userId })}`
   );
@@ -397,7 +407,7 @@ export async function deleteCV(cvId: string): Promise<void> {
 // -----------------------------------------------------------------------------
 
 export async function getDashboardStats(
-  userId: string,
+  userId?: string,
   cvId?: string
 ): Promise<DashboardStats> {
   return apiFetch<DashboardStats>(
@@ -406,7 +416,7 @@ export async function getDashboardStats(
 }
 
 export async function getNudge(
-  userId: string,
+  userId?: string,
   cvId?: string
 ): Promise<NudgeResponse> {
   return apiFetch<NudgeResponse>(
@@ -419,7 +429,7 @@ export async function getNudge(
 // -----------------------------------------------------------------------------
 
 export interface RoadmapRequest {
-  user_id: string;
+  user_id?: string;
   cv_id?: string;
   goal_id?: string;
   target_role: string;

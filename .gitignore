@@ -10,7 +10,8 @@
 .DS_Store?
 ehthumbs.db
 Thumbs.db
-desktop.ini
+desktop.ini  
+nul)
 
 # --- IDEs & Editors ---
 .vscode/
@@ -29,6 +30,7 @@ desktop.ini
 .dual-graph/
 .understand-anything/
 .gemini/
+.hallmark/
 
 # ==============================================================================
 # Backend (Python / FastAPI)
@@ -137,6 +139,15 @@ temp/
 
 # AI agent context files
 context/
+
+# Generated / auxiliary docs (only README.md is tracked)
+design.md
+STACK_REPORT.md
+SYSTEM_DESIGN.md
+DEPENDENCIES_AND_SETUP.md
+DEPLOYMENT.md
+DEPLOYMENT_GUIDE.md
+api-contracts.md
 
 # TypeScript build info
 *.tsbuildinfo

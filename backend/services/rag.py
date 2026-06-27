@@ -1,5 +1,6 @@
 import os
 from typing import List
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from backend.db.supabase_client import get_supabase_client
 from integrations.fit_score import embed_text
 from backend.logger import get_logger
@@ -93,24 +94,31 @@ def retrieve_relevant_chunks(query: str, cv_id: str = None, top_k: int = 3) -> L
     use_pinecone = pinecone_key and (groq_key or nvidia_key) and not is_placeholder(pinecone_key)
 
     if use_pinecone:
-        try:
+        def _pinecone_query():
             from pinecone import Pinecone
             pc = Pinecone(api_key=pinecone_key)
             index = pc.Index(os.getenv("PINECONE_INDEX", "careerpilot-cv"))
-            try:
-                query_vector = embed_text(query)
-            except Exception as e:
-                logger.warning("Embedding generation failed, skipping Pinecone: %s", e)
-                raise
-
+            query_vector = embed_text(query)
             filter_dict = {"cv_id": cv_id} if cv_id else None
             res = index.query(vector=query_vector, top_k=top_k, filter=filter_dict, include_metadata=True)
+            result = []
             for match in res.get("matches", []):
                 meta = match.get("metadata", {})
-                chunks.append({"section": meta.get("section", "general"), "content": meta.get("content", "")})
-            return chunks
+                result.append({"section": meta.get("section", "general"), "content": meta.get("content", "")})
+            return result
+
+        pool = ThreadPoolExecutor(max_workers=1)
+        try:
+            future = pool.submit(_pinecone_query)
+            pc_chunks = future.result(timeout=8)
+            if pc_chunks:
+                return pc_chunks
+        except TimeoutError:
+            logger.warning("Pinecone query timed out after 8s, falling back to Supabase")
         except Exception as e:
             logger.warning("Pinecone query failed, falling back to Supabase: %s", e)
+        finally:
+            pool.shutdown(wait=False)
 
     # Fetch from Supabase cv_chunks table
     try:
@@ -158,40 +166,40 @@ def generate_answer(query: str, chunks: List[dict], user_id: str = None) -> str:
         except Exception as e:
             logger.warning("Failed to get user context: %s", e)
 
-    prompt = (
-        f"You are a concise, professional AI Career Coach on the CareerPilot platform. "
-        f"Answer the user's career query based on the following candidate CV context:\n\n"
-        f"{context_str}\n\n"
+    system_prompt = (
+        "You are a precise, professional AI Career Coach on CareerPilot. "
+        "You analyze CV data and user activity to deliver concise, actionable career advice. "
+        "Focus only on what helps the user — no fluff, no generic motivation, no lengthy preambles."
     )
 
-    if user_context_str:
-        prompt += (
-            f"**User's Current Activity on CareerPilot:**\n"
-            f"{user_context_str}\n\n"
-        )
+    user_prompt = f"CV Context:\n{context_str}\n\n"
 
-    prompt += (
-        f"User Query: {query}\n\n"
-        f"RESPONSE STYLE GUIDE:\n"
-        f"- Be CONCISE: 3-5 bullet points or a short paragraph (max 150 words)\n"
-        f"- Be DIRECT: answer the question immediately, no lengthy preambles\n"
-        f"- Use BULLETS for lists, numbered for priorities\n"
-        f"- Bold key terms. No markdown headers or long explanations\n"
-        f"- If referencing their CV, quote specific skills/experience briefly\n"
-        f"- End with a clear next action or suggestion\n\n"
-        f"Provide a focused, actionable response:"
+    if user_context_str:
+        user_prompt += f"User Activity:\n{user_context_str}\n\n"
+
+    user_prompt += (
+        f"Query: {query}\n\n"
+        f"Style:\n"
+        f"- Max 150 words. 3-5 bullet points or a short paragraph.\n"
+        f"- Answer immediately — no introductions like 'Based on your CV...'\n"
+        f"- Bold key terms. No markdown headers.\n"
+        f"- Reference specific skills/experience from their CV.\n"
+        f"- End with one clear next action.\n"
+        f"- If insufficient data, say so directly — do not invent information."
     )
 
     # Try Groq (fastest free option)
     if groq_key and not is_placeholder(groq_key):
         try:
             from groq import Groq
-            client = Groq(api_key=groq_key)
+            client = Groq(api_key=groq_key, timeout=30)
             res = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7,
-                timeout=20  # 20 second timeout
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.3,
             )
             logger.info("Groq response generated successfully")
             return res.choices[0].message.content.strip()

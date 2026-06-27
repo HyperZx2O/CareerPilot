@@ -80,8 +80,8 @@ def get_supabase_user_client(user_jwt: str | None = None) -> SupabaseClient:
         try:
             from supabase.lib.client_options import ClientOptions
             client.postgrest.auth(user_jwt)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to set JWT on user-scoped client: %s — RLS may not apply", e)
         logger.info("Supabase user client initialized (JWT scope)")
         return client
     except Exception as e:

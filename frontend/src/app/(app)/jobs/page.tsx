@@ -1,349 +1,260 @@
+/* Hallmark · genre: modern-minimal · macrostructure: Workbench · design-system: design.md · designed-as-app
+ * nav: N3 side-rail · theme: Cobalt
+ * section head: S4 inline · feature: F3 tabular spec sheet · CTA: C1 outlined chip
+ */
 "use client";
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { searchJobs, apiFetch } from "@/lib/api";
 import type { Job } from "@/types";
-import { Search, MapPin, DollarSign, Calendar, ChevronDown, ChevronUp, ExternalLink, Sparkles, FileText, AlertTriangle } from "lucide-react";
+import { Search, MapPin, DollarSign, Calendar, ExternalLink, Sparkles, FileText, AlertTriangle, X } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 
 function FitBadge({ score }: { score: number | null }) {
   if (score === null) {
     return (
-      <span
-        className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-        style={{ background: "rgba(100,116,139,0.15)", color: "var(--cp-text-dim)" }}
-      >
+      <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ background: "color-mix(in srgb, var(--color-text-dim) 15%, transparent)", color: "var(--color-text-dim)" }}>
         —
       </span>
     );
   }
-
-  const color =
-    score >= 75
-      ? "var(--cp-success)"
-      : score >= 50
-        ? "var(--cp-warning)"
-        : "var(--cp-danger)";
-  const bg =
-    score >= 75
-      ? "rgba(34, 197, 94, 0.15)"
-      : score >= 50
-        ? "rgba(245, 158, 11, 0.15)"
-        : "rgba(239, 68, 68, 0.15)";
-
+  const color = score >= 75 ? "var(--color-success)" : "var(--color-accent)";
+  const bg = score >= 75
+    ? "color-mix(in srgb, var(--color-success) 15%, transparent)"
+    : "color-mix(in srgb, var(--color-accent) 15%, transparent)";
   return (
     <motion.span
-      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold"
+      className="rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums"
       style={{ background: bg, color }}
       initial={{ scale: 0 }}
       animate={{ scale: 1 }}
-      transition={{ type: "spring", stiffness: 300, damping: 15 }}
     >
       {score}%
     </motion.span>
   );
 }
 
-function JobCard({ job, index }: { job: Job; index: number }) {
+function JobRow({ job, index, onCoverLetter }: { job: Job; index: number; onCoverLetter: () => void }) {
   const [expanded, setExpanded] = useState(false);
-  const [showCoverLetter, setShowCoverLetter] = useState(false);
-  const [coverLetterText, setCoverLetterText] = useState("");
-  const [coverLetterLoading, setCoverLetterLoading] = useState(false);
-  const [coverLetterError, setCoverLetterError] = useState<string | null>(null);
-
-  async function handleGenerateCoverLetter() {
-    setCoverLetterLoading(true);
-    setCoverLetterError(null);
-    setCoverLetterText("");
-    try {
-      const res = await apiFetch<{ cover_letter: string }>(
-        `/api/jobs/${job.id}/cover-letter`,
-        {
-          method: "POST",
-          body: {
-            job_title: job.title,
-            company: job.company,
-            description: job.description,
-          },
-        }
-      );
-      setCoverLetterText(res.cover_letter);
-    } catch (err: any) {
-      setCoverLetterError(err.message || "Failed to generate cover letter");
-    }
-    setCoverLetterLoading(false);
-  }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
+      className="border-b px-5 py-4 transition-all last:border-b-0"
+      style={{ borderColor: "var(--color-border)" }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.05, ease: "easeOut" }}
-      whileHover={{
-        scale: 1.01,
-        boxShadow: "0 8px 30px rgba(0, 0, 0, 0.3)",
-      }}
-      className="group cursor-pointer overflow-hidden rounded-2xl border transition-all"
-      style={{
-        background: "var(--cp-surface)",
-        borderColor: "var(--cp-border)",
-      }}
+      transition={{ delay: index * 0.04 }}
     >
-      <div className="p-5">
-        <div className="mb-3 flex items-start justify-between">
-          <div className="flex-1 mr-4">
-            <motion.h3
-              className="font-semibold text-base"
-              whileHover={{ color: "var(--cp-primary)" }}
-            >
-              {job.title}
-            </motion.h3>
-            <div className="flex items-center gap-2 mt-1">
-              <MapPin className="h-3.5 w-3.5" style={{ color: "var(--cp-text-dim)" }} />
-              <p className="text-sm" style={{ color: "var(--cp-text-muted)" }}>
-                {job.company} · {job.location}
-              </p>
-            </div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-2">
+            <h3 className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>{job.title}</h3>
+            <FitBadge score={job.fit_score} />
           </div>
-          <FitBadge score={job.fit_score} />
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
+            <span className="flex items-center gap-1">
+              <MapPin className="h-3 w-3" style={{ color: "var(--color-text-dim)" }} />
+              {job.company} · {job.location}
+            </span>
+            {(job.salary_min || job.salary_max) && (
+              <span className="flex items-center gap-1" style={{ color: "var(--color-accent)" }}>
+                <DollarSign className="h-3 w-3" />
+                {job.currency || "$"}{job.salary_min?.toLocaleString() || "?"} – {job.salary_max?.toLocaleString() || "?"}
+              </span>
+            )}
+            {job.deadline && (
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" style={{ color: "var(--color-text-dim)" }} />
+                {job.deadline}
+              </span>
+            )}
+          </div>
+          {job.fit_reasons.length > 0 && !expanded && (
+            <p className="mt-1.5 truncate text-xs" style={{ color: "var(--color-success)" }}>
+              <Sparkles className="mr-0.5 inline h-3 w-3" />{job.fit_reasons[0]}
+            </p>
+          )}
         </div>
-
-        {/* Salary */}
-        {(job.salary_min || job.salary_max) && (
-          <motion.div
-            className="mb-3 flex items-center gap-2"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <DollarSign className="h-4 w-4" style={{ color: "var(--cp-accent)" }} />
-            <p className="text-sm font-medium" style={{ color: "var(--cp-accent)" }}>
-              {job.currency || "$"}
-              {job.salary_min?.toLocaleString() || "?"} – {job.salary_max?.toLocaleString() || "?"}
-            </p>
-          </motion.div>
-        )}
-
-        {/* Deadline */}
-        {job.deadline && (
-          <div className="flex items-center gap-2 mb-3">
-            <Calendar className="h-3.5 w-3.5" style={{ color: "var(--cp-text-dim)" }} />
-            <p className="text-xs" style={{ color: "var(--cp-text-dim)" }}>
-              Deadline: {job.deadline}
-            </p>
-          </div>
-        )}
-
-        {/* Fit reasons */}
-        {job.fit_reasons.length > 0 && (
-          <motion.div className="mb-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <p
-              className="mb-1 flex items-center gap-1 text-xs font-semibold"
-              style={{ color: "var(--cp-success)" }}
-            >
-              <Sparkles className="h-3 w-3" />
-              Fit reasons
-            </p>
-            <ul
-              className="ml-4 list-disc space-y-0.5 text-xs"
-              style={{ color: "var(--cp-text-muted)" }}
-            >
-              {job.fit_reasons.map((r, i) => (
-                <motion.li
-                  key={i}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                >
-                  {r}
-                </motion.li>
-              ))}
-            </ul>
-          </motion.div>
-        )}
-
-        {/* Gap reasons */}
-        {job.gap_reasons.length > 0 && (
-          <motion.div className="mb-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <p
-              className="mb-1 flex items-center gap-1 text-xs font-semibold"
-              style={{ color: "var(--cp-warning)" }}
-            >
-              <AlertTriangle className="h-3 w-3" /> Gaps
-            </p>
-            <ul
-              className="ml-4 list-disc space-y-0.5 text-xs"
-              style={{ color: "var(--cp-text-muted)" }}
-            >
-              {job.gap_reasons.map((r, i) => (
-                <motion.li
-                  key={i}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                >
-                  {r}
-                </motion.li>
-              ))}
-            </ul>
-          </motion.div>
-        )}
-
-        {/* Actions */}
-        <div className="mt-4 flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2">
           <motion.a
             href={job.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-2 text-xs font-semibold text-white shadow-lg transition-shadow hover:shadow-xl"
+            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
+            style={{ background: "var(--color-accent)" }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
             Apply
-            <ExternalLink className="h-3.5 w-3.5" />
+            <ExternalLink className="ml-1 inline h-3 w-3" />
           </motion.a>
           <motion.button
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1 rounded-lg border px-4 py-2 text-xs font-medium transition-colors hover:bg-indigo-500/10"
-            style={{ borderColor: "var(--cp-border)", color: "var(--cp-text-muted)" }}
+            onClick={onCoverLetter}
+            className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            {expanded ? "Less" : "More"}
-            {expanded ? (
-              <ChevronUp className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronDown className="h-3.5 w-3.5" />
-            )}
+            <FileText className="mr-1 inline h-3 w-3" />
+            Letter
           </motion.button>
           <motion.button
-            onClick={() => {
-              setShowCoverLetter(true);
-              if (!coverLetterText && !coverLetterLoading) {
-                handleGenerateCoverLetter();
-              }
-            }}
-            className="flex items-center gap-1 rounded-lg border px-4 py-2 text-xs font-medium transition-colors hover:bg-amber-500/10"
-            style={{ borderColor: "var(--cp-border)", color: "var(--cp-text-muted)" }}
+            onClick={() => setExpanded(!expanded)}
+            className="rounded-lg px-2 py-1.5 text-xs"
+            style={{ color: "var(--color-text-dim)" }}
             whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
           >
-            <FileText className="h-3.5 w-3.5" />
-            Cover Letter
+            {expanded ? "Less" : "More"}
           </motion.button>
         </div>
       </div>
 
-      {/* Expanded description */}
       <AnimatePresence>
         {expanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3 }}
             className="overflow-hidden"
           >
-            <div
-              className="mx-5 mb-5 rounded-lg p-4 text-sm leading-relaxed"
-              style={{
-                background: "var(--cp-surface-2)",
-                color: "var(--cp-text-muted)",
-              }}
-            >
-              {job.description?.slice(0, 500)}
-              {job.description && job.description.length > 500 && "…"}
+            <div className="mt-3 space-y-2 border-t pt-3" style={{ borderColor: "var(--color-border)" }}>
+              {job.fit_reasons.length > 0 && (
+                <div>
+                  <p className="mb-1 text-xs font-semibold" style={{ color: "var(--color-success)" }}>Fit reasons</p>
+                  <ul className="ml-4 list-disc space-y-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                    {job.fit_reasons.map((r, i) => <li key={i}>{r}</li>)}
+                  </ul>
+                </div>
+              )}
+              {job.gap_reasons.length > 0 && (
+                <div>
+                  <p className="mb-1 text-xs font-semibold" style={{ color: "var(--color-accent)" }}>Gaps</p>
+                  <ul className="ml-4 list-disc space-y-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                    {job.gap_reasons.map((r, i) => <li key={i}>{r}</li>)}
+                  </ul>
+                </div>
+              )}
+              {job.description && (
+                <p className="text-xs leading-relaxed" style={{ color: "var(--color-text-dim)" }}>
+                  {job.description.slice(0, 500)}{job.description.length > 500 && "…"}
+                </p>
+              )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+    </motion.div>
+  );
+}
 
-      {/* Cover Letter Modal */}
-      <AnimatePresence>
-        {showCoverLetter && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ background: "rgba(0,0,0,0.6)" }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setShowCoverLetter(false);
-            }}
-          >
-            <motion.div
-              className="relative w-full max-w-2xl overflow-hidden rounded-2xl border p-6"
-              style={{ background: "var(--cp-surface)", borderColor: "var(--cp-border)" }}
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            >
-              <h2 className="mb-4 flex items-center gap-2 text-xl font-bold">
-                <FileText className="h-5 w-5" />
-                Cover Letter — {job.title}
-              </h2>
+function CoverLetterPanel({ job, onClose }: { job: Job; onClose: () => void }) {
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-              {coverLetterLoading && (
-                <div className="flex h-48 items-center justify-center">
-                  <motion.div
-                    className="h-8 w-8 rounded-full border-2 border-t-transparent"
-                    style={{ borderColor: "var(--cp-primary)", borderTopColor: "transparent" }}
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  />
-                </div>
-              )}
+  async function handleGenerate() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch<{ cover_letter: string }>(
+        `/api/jobs/${job.id}/cover-letter`,
+        { method: "POST", body: { job_title: job.title, company: job.company, description: job.description } }
+      );
+      setText(res.cover_letter);
+    } catch (err: any) {
+      setError(err.message || "Failed to generate");
+    }
+    setLoading(false);
+  }
 
-              {coverLetterError && (
-                <div
-                  className="mb-4 rounded-xl border p-4 text-sm"
-                  style={{
-                    background: "rgba(239,68,68,0.1)",
-                    borderColor: "var(--cp-danger)",
-                    color: "var(--cp-danger)",
-                  }}
-                >
-                  {coverLetterError}
-                </div>
-              )}
+  return (
+    <motion.div
+      className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg border-l shadow-lg"
+      style={{ background: "var(--color-paper)", borderColor: "var(--color-border)" }}
+      initial={{ x: "100%" }}
+      animate={{ x: 0 }}
+      exit={{ x: "100%" }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+    >
+      <div className="flex w-full flex-col">
+        <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
+          <div>
+            <h2 className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>Cover Letter</h2>
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{job.title} · {job.company}</p>
+          </div>
+          <motion.button onClick={onClose} className="rounded-lg p-2" whileHover={{ scale: 1.1 }} style={{ color: "var(--color-text-dim)" }}>
+            <X className="h-4 w-4" />
+          </motion.button>
+        </div>
 
-              {coverLetterText && (
-                <textarea
-                  className="mb-4 w-full rounded-xl border bg-[var(--cp-surface-2)] p-4 text-sm leading-relaxed outline-none"
-                  style={{ borderColor: "var(--cp-border)", color: "var(--cp-text)", minHeight: "300px" }}
-                  value={coverLetterText}
-                  readOnly
-                />
-              )}
+        <div className="flex-1 overflow-y-auto p-5">
+          {!text && !loading && !error && (
+            <div className="flex h-full flex-col items-center justify-center gap-4">
+              <FileText className="h-10 w-10" style={{ color: "var(--color-text-dim)" }} strokeWidth={1.5} />
+              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Generate a tailored cover letter for this role</p>
+              <motion.button
+                onClick={handleGenerate}
+                className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white"
+                style={{ background: "var(--color-accent)" }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Sparkles className="mr-2 inline h-4 w-4" />
+                Generate
+              </motion.button>
+            </div>
+          )}
+          {loading && (
+            <div className="flex h-full items-center justify-center">
+              <motion.div
+                className="h-8 w-8 rounded-full border-2"
+                style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              />
+            </div>
+          )}
+          {error && (
+            <div className="rounded-xl border p-4 text-sm" style={{ borderColor: "var(--color-accent)", color: "var(--color-accent)", background: "color-mix(in srgb, var(--color-accent) 8%, var(--color-paper))" }}>
+              <AlertTriangle className="mr-2 inline h-4 w-4" />{error}
+            </div>
+          )}
+          {text && (
+            <textarea
+              className="w-full rounded-xl border bg-[var(--color-paper-2)] p-4 text-sm leading-relaxed outline-none"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text)", minHeight: "300px" }}
+              value={text}
+              readOnly
+            />
+          )}
+        </div>
 
-              <div className="flex gap-3">
-                {coverLetterText && (
-                  <motion.button
-                    onClick={() => {
-                      navigator.clipboard.writeText(coverLetterText);
-                    }}
-                    className="flex-1 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 py-2.5 text-sm font-semibold text-white"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    Copy
-                  </motion.button>
-                )}
-                <motion.button
-                  onClick={() => setShowCoverLetter(false)}
-                  className="flex-1 rounded-xl border py-2.5 text-sm font-medium"
-                  style={{ borderColor: "var(--cp-border)", color: "var(--cp-text-muted)" }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  Close
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
+        {text && (
+          <div className="border-t px-5 py-4" style={{ borderColor: "var(--color-border)" }}>
+            <div className="flex gap-3">
+              <motion.button
+                onClick={() => navigator.clipboard.writeText(text)}
+                className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white"
+                style={{ background: "var(--color-accent)" }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Copy
+              </motion.button>
+              <motion.button
+                onClick={onClose}
+                className="flex-1 rounded-xl border py-2.5 text-sm font-medium"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Close
+              </motion.button>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </div>
     </motion.div>
   );
 }
@@ -355,6 +266,7 @@ export default function JobsPage() {
   const [error, setError] = useState<string | null>(null);
   const [localJobs, setLocalJobs] = useState<Job[]>([]);
   const [localLoading, setLocalLoading] = useState(false);
+  const [coverLetterJob, setCoverLetterJob] = useState<Job | null>(null);
   const setJobs = useAppStore((s) => s.setJobs);
   const setJobsLoading = useAppStore((s) => s.setJobsLoading);
 
@@ -378,69 +290,39 @@ export default function JobsPage() {
     setJobsLoading(false);
   }
 
-
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
     >
-      <motion.div className="mb-8" variants={{
-        hidden: { opacity: 0 },
-        visible: { opacity: 1, transition: { delay: 0.2 } },
-      }}>
-        <motion.h1
-          className="mb-1 text-3xl font-bold"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          Job Hunter
-        </motion.h1>
-        <motion.p
-          style={{ color: "var(--cp-text-muted)" }}
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          Search live jobs with AI-powered fit scores
-        </motion.p>
-      </motion.div>
+      <div className="mb-6">
+        <h1 className="text-2xl" style={{ fontFamily: "var(--font-display)", color: "var(--color-text)" }}>Job Hunter</h1>
+        <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>Search live jobs with AI-powered fit scores</p>
+      </div>
 
-
-      {/* Search form */}
+      {/* Search banner */}
       <motion.form
         onSubmit={handleSearch}
-        className="mb-8 overflow-hidden rounded-2xl border p-4"
-        style={{
-          background: "var(--cp-surface)",
-          borderColor: "var(--cp-border)",
-        }}
-        initial={{ opacity: 0, y: 20 }}
+        className="mb-6 overflow-hidden rounded-xl border"
+        style={{ background: "var(--color-paper)", borderColor: "var(--color-border)" }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
       >
-        <div className="flex flex-col gap-4 md:flex-row">
-          <motion.div className="w-full md:flex-1" whileFocus={{ scale: 1.01 }}>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2" style={{ color: "var(--cp-text-dim)" }} />
-              <input
-                className="w-full rounded-xl border bg-[var(--cp-surface-2)] px-4 py-3 pl-10 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                style={{
-                  borderColor: "var(--cp-border)",
-                  color: "var(--cp-text)",
-                }}
-                placeholder="e.g. React developer, ML engineer, Data analyst..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </div>
-          </motion.div>
+        <div className="flex flex-col gap-3 p-4 md:flex-row md:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--color-text-dim)" }} />
+            <input
+              className="w-full rounded-xl border bg-[var(--color-paper-2)] px-4 py-2.5 pl-9 text-sm outline-none transition-all focus:border-[var(--color-accent)]"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+              placeholder="e.g. React developer, ML engineer..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
           <select
-            className="w-full rounded-xl border bg-[var(--cp-surface-2)] px-4 py-3 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 md:w-auto"
-            style={{
-              borderColor: "var(--cp-border)",
-              color: "var(--cp-text)",
-            }}
+            className="rounded-xl border bg-[var(--color-paper-2)] px-4 py-2.5 text-sm outline-none transition-all focus:border-[var(--color-accent)]"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
             value={location}
             onChange={(e) => setLocation(e.target.value)}
           >
@@ -452,118 +334,58 @@ export default function JobsPage() {
           </select>
           <motion.button
             type="submit"
-            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-shadow hover:shadow-xl disabled:opacity-50"
+            className="flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+            style={{ background: "var(--color-accent)" }}
             disabled={localLoading}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
           >
             {localLoading ? (
-              <>
-                <motion.div
-                  className="h-4 w-4 rounded-full border-2 border-t-transparent"
-                  style={{ borderColor: "white", borderTopColor: "transparent" }}
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                />
-                Searching…
-              </>
+              <motion.div className="h-4 w-4 rounded-full border-2 border-t-transparent" style={{ borderColor: "white", borderTopColor: "transparent" }} animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} />
             ) : (
-              <>
-                <Search className="h-4 w-4" />
-                Search
-              </>
+              "Search"
             )}
           </motion.button>
         </div>
       </motion.form>
 
-      {/* Error message */}
       {!localLoading && error && (
-        <motion.div
-          className="mb-6 rounded-xl border p-4 text-center"
-          style={{
-            background: "rgba(239,68,68,0.1)",
-            borderColor: "var(--cp-danger)",
-            color: "var(--cp-danger)",
-          }}
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <p className="font-medium">Search failed</p>
-          <p className="mt-1 text-sm opacity-80">{error}</p>
+        <motion.div className="mb-6 rounded-xl border p-4 text-sm" style={{ borderColor: "var(--color-accent)", background: "color-mix(in srgb, var(--color-accent) 8%, var(--color-paper))", color: "var(--color-accent)" }}>
+          <AlertTriangle className="mr-2 inline h-4 w-4" />{error}
         </motion.div>
       )}
 
-      {/* Loading spinner */}
       {localLoading && (
-        <motion.div
-          className="flex h-40 items-center justify-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
-          <motion.div
-            className="h-12 w-12 rounded-full border-4 border-t-transparent"
-            style={{ borderColor: "var(--cp-primary)", borderTopColor: "transparent" }}
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          />
-        </motion.div>
+        <div className="flex h-40 items-center justify-center">
+          <motion.div className="h-10 w-10 rounded-full border-4" style={{ borderColor: "var(--color-border)", borderTopColor: "var(--color-accent)" }} animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} />
+        </div>
       )}
 
-      {/* No jobs found */}
       {!localLoading && !error && searched && localJobs.length === 0 && (
-        <motion.div
-          className="rounded-2xl border p-12 text-center"
-          style={{
-            background: "var(--cp-surface)",
-            borderColor: "var(--cp-border)",
-          }}
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-        >
-          <motion.div
-            className="mb-4 flex justify-center"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
-          >
-            <Search className="h-12 w-12" style={{ color: "var(--cp-text-dim)" }} strokeWidth={1.5} />
-          </motion.div>
-          <motion.p
-            className="mb-2 text-xl font-semibold"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            No jobs found
-          </motion.p>
-          <motion.p
-            style={{ color: "var(--cp-text-muted)" }}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            Try different keywords or location
-          </motion.p>
+        <motion.div className="flex flex-col items-center justify-center rounded-xl border py-16" style={{ background: "var(--color-paper)", borderColor: "var(--color-border)" }}>
+          <Search className="mb-3 h-10 w-10" style={{ color: "var(--color-text-dim)" }} strokeWidth={1.5} />
+          <p className="mb-1 text-base font-semibold" style={{ color: "var(--color-text)" }}>No jobs found</p>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Try different keywords or location</p>
         </motion.div>
       )}
 
       {!localLoading && localJobs.length > 0 && (
-        <motion.div
-          className="grid gap-5 md:grid-cols-2 xl:grid-cols-3"
-          initial="hidden"
-          animate="visible"
-          variants={{
-            hidden: { opacity: 0 },
-            visible: {
-              transition: { staggerChildren: 0.05 },
-            },
-          }}
-        >
-          {localJobs.map((job, index) => (
-            <JobCard key={job.id} job={job} index={index} />
+        <motion.div className="overflow-hidden rounded-xl border" style={{ background: "var(--color-paper)", borderColor: "var(--color-border)" }}>
+          <div className="border-b px-5 py-3" style={{ borderColor: "var(--color-border)" }}>
+            <span className="mr-1 text-sm font-semibold tabular-nums" style={{ color: "var(--color-text)" }}>{localJobs.length}</span>
+            <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>matches found</span>
+          </div>
+          {localJobs.map((job, i) => (
+            <JobRow key={job.id} job={job} index={i} onCoverLetter={() => setCoverLetterJob(job)} />
           ))}
         </motion.div>
       )}
+
+      <AnimatePresence>
+        {coverLetterJob && (
+          <CoverLetterPanel job={coverLetterJob} onClose={() => setCoverLetterJob(null)} />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

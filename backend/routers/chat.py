@@ -1,5 +1,7 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException
-from backend.auth import get_current_user, get_supabase_user_client
+from backend.auth import get_current_user
+from backend.db.supabase_client import get_supabase_client
 from backend.services.rag import retrieve_relevant_chunks, generate_answer
 from backend.logger import get_logger
 from pydantic import BaseModel, Field
@@ -16,7 +18,7 @@ def post_message(
     request: ChatRequest,
     user = Depends(get_current_user)
 ):
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
     
     content = request.content
     logger.info("Message received: %s...", content[:50])
@@ -43,18 +45,18 @@ def post_message(
         cv_id = cv_result.data[0]["id"] if cv_result.data else None
     logger.info("CV found: %s", cv_id)
 
-    chunks = retrieve_relevant_chunks(query=content, cv_id=cv_id)
-    logger.info("Retrieved %d chunks", len(chunks))
-
     try:
+        chunks = retrieve_relevant_chunks(query=content, cv_id=cv_id)
+        logger.info("Retrieved %d chunks", len(chunks))
         answer = generate_answer(content, chunks, user_id=user_id_str)
         logger.info("Answer generated successfully (%d chars)", len(answer))
     except Exception as e:
-        logger.error("Failed to generate answer: %s", e)
-        answer = (
-            "I'm having trouble processing your message right now. "
-            "Please try again in a moment. If the issue persists, ensure your CV is uploaded and processed."
-        )
+        logger.exception("Chat processing failed")
+        env = os.getenv("ENV", "development").lower()
+        if env != "production":
+            answer = f"I'm having trouble processing your message. The error was: {e}"
+        else:
+            answer = "I'm having trouble processing your message right now. Please try again."
 
     if db_user_id:
         try:

@@ -6,8 +6,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_valid
 class ApplicationStatus(str, Enum):
     applied = "applied"
     interviewing = "interviewing"
+    interview = "interview"
     offer = "offer"
     rejected = "rejected"
+    withdrawn = "withdrawn"
 
 class ApplicationBase(BaseModel):
     user_id: Optional[str] = None

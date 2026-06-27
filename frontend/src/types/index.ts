@@ -46,7 +46,7 @@ export interface Job {
   fetched_at: string;
 }
 
-export type ApplicationStatus = "applied" | "interviewing" | "offer" | "rejected";
+export type ApplicationStatus = "applied" | "interviewing" | "offer" | "rejected" | "interview" | "withdrawn";
 
 export interface Application {
   id: string;

@@ -72,7 +72,7 @@ async def clerk_webhook(request: Request):
         if not existing.data:
             email = data.email_addresses[0].email_address if data.email_addresses else ""
             supabase.table("users").insert({
-                "id": user_id,
+                "clerk_id": user_id,
                 "email": email,
             }).execute()
             logger.info("Created user %s via Clerk webhook", user_id)
@@ -82,7 +82,7 @@ async def clerk_webhook(request: Request):
         email = data.email_addresses[0].email_address if data.email_addresses else ""
         supabase.table("users").update({
             "email": email,
-        }).eq("id", user_id).execute()
+        }).eq("clerk_id", user_id).execute()
         logger.info("Updated user %s via Clerk webhook", user_id)
         return {"ok": True, "action": "updated"}
 

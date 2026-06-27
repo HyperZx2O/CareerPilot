@@ -22,10 +22,13 @@ const nextConfig = {
     ];
   },
   async headers() {
+    const clerkApi = "https://ready-gannet-55.clerk.accounts.dev";
+    const clerkImg = "https://img.clerk.com";
     const connectSrc = [
       "'self'",
       "http://localhost:8000",
       "http://127.0.0.1:8000",
+      clerkApi,
     ];
     if (apiOrigin) {
       connectSrc.push(apiOrigin);
@@ -39,12 +42,12 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              `script-src 'self' 'unsafe-eval' 'unsafe-inline' ${clerkApi}`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
               "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: blob:",
+              `img-src 'self' data: blob: ${clerkImg}`,
               `connect-src ${connectSrc.join(" ")}`,
-              "frame-src 'self'",
+              `frame-src 'self' ${clerkApi}`,
               "worker-src 'self' blob:",
               "base-uri 'self'",
               "form-action 'self'",

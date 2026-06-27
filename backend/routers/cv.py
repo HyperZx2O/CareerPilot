@@ -6,7 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
 from backend.db.supabase_client import get_supabase_client
-from backend.auth import get_current_user, get_user_supabase_client
+from backend.auth import get_current_user
 from backend.logger import get_logger
 
 logger = get_logger("cv")
@@ -18,14 +18,20 @@ def _resolve_db_user_id(supabase, auth_user_id: str) -> str | None:
     """Convert an auth user id (clerk_id) to the internal `users.id` UUID."""
     try:
         row = supabase.table("users").select("id").eq("clerk_id", auth_user_id).limit(1).execute()
+        if row.data:
+            return row.data[0]["id"]
+        supabase.table("users").insert({"clerk_id": auth_user_id}).execute()
+        row = supabase.table("users").select("id").eq("clerk_id", auth_user_id).limit(1).execute()
         return row.data[0]["id"] if row.data else None
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to resolve/create DB user: %s", e)
         return None
 
 
 @router.get("/api/cv/sections/{cv_id}")
-async def get_cv_sections(cv_id: str, supabase=Depends(get_user_supabase_client), user=Depends(get_current_user)):
+async def get_cv_sections(cv_id: str, user=Depends(get_current_user)):
     """Fetch parsed CV sections for display."""
+    supabase = get_supabase_client()
     user_id = str(user.id) if user.id else None
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -55,9 +61,9 @@ async def get_cv_sections(cv_id: str, supabase=Depends(get_user_supabase_client)
 async def upload_cv(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    supabase=Depends(get_user_supabase_client),
     user=Depends(get_current_user),
 ):
+    supabase = get_supabase_client()
     user_id = str(user.id) if user.id else None
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -142,10 +148,10 @@ async def upload_cv(
 @router.delete("/api/cv/{cv_id}")
 async def delete_cv(
     cv_id: str,
-    supabase=Depends(get_user_supabase_client),
     user=Depends(get_current_user),
 ):
     """Delete a CV and its associated chunks. Only the owner can delete."""
+    supabase = get_supabase_client()
     user_id = str(user.id) if user.id else None
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")

@@ -5,8 +5,9 @@ from pathlib import Path
 root_path = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(root_path))
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
+from backend.auth import get_current_user
 from backend.db.supabase_client import get_supabase_client
 from backend.models.schemas import TodoResponse
 from backend.services.roadmap import generate_roadmap
@@ -18,14 +19,14 @@ router = APIRouter(prefix="/api/roadmap", tags=["Roadmap"])
 
 
 class RoadmapRequest(BaseModel):
-    user_id: str = Field(..., min_length=1)
+    user_id: str = ""
     cv_id: str | None = None
     goal_id: str | None = None
     target_role: str = Field(..., min_length=1, max_length=200)
 
 
 @router.post("/generate", status_code=status.HTTP_201_CREATED)
-async def generate_roadmap_endpoint(payload: RoadmapRequest):
+async def generate_roadmap_endpoint(payload: RoadmapRequest, user = Depends(get_current_user)):
     """
     Generates a week-by-week learning roadmap from CV skills and creates
     todo items linked to the specified goal (or unlinked if no goal_id).
@@ -57,6 +58,8 @@ async def generate_roadmap_endpoint(payload: RoadmapRequest):
         logger.warning("generation failed: %s", e)
         todos_text = []
 
+    uid = str(user.id)
+
     # Create todo rows in Supabase
     inserted = []
     for i, step in enumerate(todos_text):
@@ -69,7 +72,7 @@ async def generate_roadmap_endpoint(payload: RoadmapRequest):
             pass
 
         todo_payload = {
-            "user_id": payload.user_id,
+            "user_id": uid,
             "title": step["title"],
             "goal_id": payload.goal_id,
             "due_date": due_date,
@@ -81,7 +84,7 @@ async def generate_roadmap_endpoint(payload: RoadmapRequest):
     # Log activity (defensive - don't crash endpoint if activity_log fails)
     try:
         supabase.table("activity_log").insert({
-            "user_id": payload.user_id,
+            "user_id": uid,
             "action": "roadmap_generated",
         }).execute()
     except Exception:

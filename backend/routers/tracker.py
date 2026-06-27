@@ -3,7 +3,8 @@ import sys
 from datetime import date as date_type, datetime, timedelta, timezone
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
-from backend.auth import get_current_user, get_supabase_user_client
+from backend.auth import get_current_user
+from backend.db.supabase_client import get_supabase_client
 from backend.logger import get_logger
 
 logger = get_logger("tracker")
@@ -46,7 +47,7 @@ async def get_applications_endpoint(user = Depends(get_current_user), user_id: s
         # If user_id provided, must match authenticated user
         if user_id != str(user.id):
             raise HTTPException(status_code=403, detail="Forbidden: cannot access other users' applications")
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
     result = supabase.table("applications").select("*").eq("user_id", user_id).order("applied_at", desc=True).execute()
     return {"applications": [ApplicationResponse(**app) for app in result.data]}
 
@@ -55,7 +56,7 @@ async def create_application_endpoint(payload: ApplicationCreate, user = Depends
     """
     Inserts a new job application for the authenticated user and writes a row in the activity log.
     """
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
     payload_dict = payload.model_dump()
     payload_dict["user_id"] = str(user.id)
     if payload_dict.get("applied_at") is None:
@@ -77,7 +78,7 @@ async def update_application_endpoint(id: str, payload: ApplicationUpdate, user 
     """
     Partially updates an existing application belonging to the authenticated user and logs the activity.
     """
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
     # Fetch existing application
     result = supabase.table("applications").select("*").eq("id", id).execute()
     if not result.data:
@@ -111,7 +112,7 @@ async def delete_application_endpoint(id: str, user = Depends(get_current_user))
     """
     Removes a job application belonging to the authenticated user and logs the activity.
     """
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
     # Fetch existing application
     result = supabase.table("applications").select("*").eq("id", id).execute()
     if not result.data:
@@ -141,13 +142,13 @@ async def delete_application_endpoint(id: str, user = Depends(get_current_user))
 # Helper: recalculate goal progress based on linked todos
 # ====================================================================
 
-async def _recalculate_goal_progress(goal_id: str, user_jwt: str = "") -> None:
+async def _recalculate_goal_progress(goal_id: str) -> None:
     """
     Recomputes a goal's progress field as:
         progress = round(done_count / total_count * 100)
     and persists the update.  Called whenever a linked todo's done status changes.
     """
-    supabase = get_supabase_user_client(user_jwt)
+    supabase = get_supabase_client()
     
     # Fetch goal
     result = supabase.table("goals").select("*").eq("id", goal_id).execute()
@@ -179,7 +180,7 @@ async def get_todos_endpoint(user = Depends(get_current_user), user_id: str | No
     else:
         if user_id != str(user.id):
             raise HTTPException(status_code=403, detail="Forbidden: cannot access other users' todos")
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
     query = supabase.table("todos").select("*").eq("user_id", user_id)
     if date is not None:
         query = query.eq("due_date", date)
@@ -192,7 +193,7 @@ async def create_todo_endpoint(payload: TodoCreate, user = Depends(get_current_u
     """
     Creates a new todo for the authenticated user and logs the activity.
     """
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
     payload_dict = payload.model_dump()
     # Ensure todo is linked to the authenticated user
     payload_dict["user_id"] = str(user.id)
@@ -215,7 +216,7 @@ async def update_todo_endpoint(id: str, payload: TodoUpdate, user = Depends(get_
     Partially updates a todo.  When `done` changes and the todo has a
     linked goal, the goal's progress is automatically recalculated.
     """
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
     
     # Fetch existing todo
     result = supabase.table("todos").select("*").eq("id", id).execute()
@@ -247,7 +248,7 @@ async def update_todo_endpoint(id: str, payload: TodoUpdate, user = Depends(get_
     
     # Auto-recalculate linked goal progress when done status changes
     if "done" in update_data and todo_data.get("goal_id"):
-        await _recalculate_goal_progress(todo_data["goal_id"], user.jwt)
+        await _recalculate_goal_progress(todo_data["goal_id"])
 
     return TodoResponse(**todo_data)
 
@@ -255,7 +256,7 @@ async def update_todo_endpoint(id: str, payload: TodoUpdate, user = Depends(get_
 @router.delete("/todos/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_todo_endpoint(id: str, user = Depends(get_current_user)):
     """Deletes a todo by id and logs the activity."""
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
     
     # Fetch existing todo
     result = supabase.table("todos").select("*").eq("id", id).execute()
@@ -285,7 +286,7 @@ async def delete_todo_endpoint(id: str, user = Depends(get_current_user)):
     
     # Recalculate linked goal progress after removing a todo
     if goal_id:
-        await _recalculate_goal_progress(goal_id, user.jwt)
+        await _recalculate_goal_progress(goal_id)
 
 
 # ====================================================================
@@ -295,7 +296,7 @@ async def delete_todo_endpoint(id: str, user = Depends(get_current_user)):
 @router.get("/goals")
 async def get_goals_endpoint(user = Depends(get_current_user)):
     """Fetches all goals for the authenticated user."""
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
     result = supabase.table("goals").select("*").eq("user_id", str(user.id)).order("created_at", desc=True).execute()
     return {"goals": [GoalResponse(**g) for g in result.data]}
 
@@ -303,7 +304,7 @@ async def get_goals_endpoint(user = Depends(get_current_user)):
 @router.post("/goals", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)
 async def create_goal_endpoint(payload: GoalCreate, user = Depends(get_current_user)):
     """Creates a new goal for the authenticated user and logs the activity."""
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
     payload_dict = payload.model_dump()
     # Ensure goal linked to the authenticated user
     payload_dict["user_id"] = str(user.id)
@@ -323,7 +324,7 @@ async def create_goal_endpoint(payload: GoalCreate, user = Depends(get_current_u
 @router.patch("/goals/{id}", response_model=GoalResponse)
 async def update_goal_endpoint(id: str, payload: GoalUpdate, user = Depends(get_current_user)):
     """Partially updates a goal belonging to the authenticated user. The `progress` field is validated 0–100 by the schema."""
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
 
     # Fetch existing goal
     result = supabase.table("goals").select("*").eq("id", id).execute()
@@ -362,7 +363,7 @@ async def delete_goal_endpoint(id: str, user = Depends(get_current_user)):
     Deletes a goal belonging to the authenticated user and **cascade-deletes** all todos linked to it.
     Logs the activity.
     """
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
 
     # Fetch existing goal
     result = supabase.table("goals").select("*").eq("id", id).execute()
@@ -401,7 +402,7 @@ async def generate_goals_endpoint(user = Depends(get_current_user), cv_id: str |
     Generates3 AI career goals from the user's CV skills.
     Clears any existing AI-generated goals for the user first, then inserts new ones.
     """
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
     # Use authenticated user's ID
     user_id = str(user.id)
 
@@ -411,7 +412,7 @@ async def generate_goals_endpoint(user = Depends(get_current_user), cv_id: str |
     if not resolved_cv_id:
         resolved_cv_id = _resolve_latest_cv_id(supabase, user_id)
     if resolved_cv_id:
-        db_user_id = _resolve_latest_cv_db_id(supabase, user_id)
+        db_user_id = _resolve_db_user_id(supabase, user_id)
         if db_user_id:
             cv_owner = supabase.table("cvs").select("user_id").eq("id", resolved_cv_id).execute()
             if not cv_owner.data or cv_owner.data[0].get("user_id") != db_user_id:
@@ -547,13 +548,13 @@ def _resolve_latest_cv_id(supabase, user_id: str) -> str | None:
     return None
 
 
-def _compute_streak(user_id: str, user_jwt: str = "") -> int:
+def _compute_streak(user_id: str) -> int:
     """
     Count consecutive days (from today backwards) where the activity_log
     has at least one entry for the user.  Stops on the first day with
     no entry.
     """
-    supabase = get_supabase_user_client(user_jwt)
+    supabase = get_supabase_client()
     today = datetime.now(timezone.utc).date()
 
     # Fetch all activity entries for this user (select only created_at)
@@ -600,7 +601,7 @@ async def get_dashboard_stats(
         user_id = str(user.id)
     elif user_id != str(user.id):
         raise HTTPException(status_code=403, detail="Forbidden: cannot access other users' dashboard stats")
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
     now = datetime.now(timezone.utc)
     seven_days_ago = (now - timedelta(days=7)).isoformat()
     fourteen_days_ago = (now - timedelta(days=14)).isoformat()
@@ -631,7 +632,7 @@ async def get_dashboard_stats(
     roadmap_progress = roadmap_result.data[0]["progress"] if roadmap_result.data else 0
 
     # ── Streak ─────────────────────────────────────────────────────
-    streak_days = _compute_streak(user_id, user.jwt)
+    streak_days = _compute_streak(user_id)
 
     # ── Top jobs ───────────────────────────────────────────────────
     top_jobs: list[dict] = []
@@ -679,7 +680,7 @@ async def get_nudge(
         user_id = str(user.id)
     elif user_id != str(user.id):
         raise HTTPException(status_code=403, detail="Forbidden: cannot access other users' nudge data")
-    supabase = get_supabase_user_client(user.jwt)
+    supabase = get_supabase_client()
     three_days_ago = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
 
     # Check for recent activity

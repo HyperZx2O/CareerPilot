@@ -1,12 +1,17 @@
+/* Hallmark · genre: modern-minimal · macrostructure: Workbench · design-system: design.md · designed-as-app
+ * nav: N3 side-rail · theme: Cobalt
+ * section head: S4 inline · CTA: C2 inline form
+ */
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { useUser } from "@clerk/nextjs";
 import { sendChatMessage, getChatHistory } from "@/lib/api";
 import type { ChatMessage } from "@/types";
 import { Send, Bot, User, RefreshCw } from "lucide-react";
+
+const MarkdownRenderer = lazy(() => import("./MarkdownRenderer"));
 
 interface Message {
   role: "user" | "assistant";
@@ -23,25 +28,16 @@ const SUGGESTIONS = [
 
 function TypingIndicator() {
   return (
-    <motion.div
-      className="mt-3 flex items-center gap-1.5"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-    >
-      <motion.div
-        className="flex h-8 w-8 items-center justify-center rounded-full"
-        style={{ background: "var(--cp-surface-2)" }}
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-      >
-        <Bot className="h-4 w-4" style={{ color: "var(--cp-text-muted)" }} />
-      </motion.div>
-      <div className="ml-2 flex gap-1">
+    <motion.div className="flex items-center gap-2 px-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: "var(--color-paper-2)" }}>
+        <Bot className="h-3 w-3" style={{ color: "var(--color-text-muted)" }} />
+      </div>
+      <div className="flex gap-1">
         {[0, 1, 2].map((i) => (
           <motion.span
             key={i}
-            className="block h-2 w-2 rounded-full"
-            style={{ background: "var(--cp-text-dim)" }}
+            className="block h-1.5 w-1.5 rounded-full"
+            style={{ background: "var(--color-text-dim)" }}
             animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
             transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
           />
@@ -55,117 +51,75 @@ function MessageBubble({ msg, index }: { msg: Message; index: number }) {
   const isUser = msg.role === "user";
   return (
     <motion.div
-      initial={{ opacity: 0, x: isUser ? 20 : -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
-      className={`flex items-end gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, delay: index * 0.03 }}
+      className={`flex items-start gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}
     >
-      <motion.div
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-        style={{
-          background: isUser ? "var(--cp-primary)" : "var(--cp-surface-2)",
-          color: isUser ? "#fff" : "var(--cp-text-muted)",
-        }}
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: "spring", stiffness: 300 }}
+      <div
+        className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+        style={{ background: isUser ? "var(--color-accent)" : "var(--color-paper-2)" }}
       >
-        {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-      </motion.div>
-      <div className={`max-w-[75%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-1`}>
+        {isUser ? <User className="h-3.5 w-3.5 text-white" /> : <Bot className="h-3.5 w-3.5" style={{ color: "var(--color-text-muted)" }} />}
+      </div>
+      <div className={`max-w-[75%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-0.5`}>
         <div
-          className="overflow-hidden rounded-2xl px-4 py-3 text-sm"
+          className="rounded-xl px-3.5 py-2.5 text-sm leading-relaxed"
           style={{
-            background: isUser ? "var(--cp-primary)" : "var(--cp-surface)",
-            color: isUser ? "#fff" : "var(--cp-text)",
-            border: isUser ? "none" : "1px solid var(--cp-border)",
+            background: isUser ? "var(--color-accent)" : "var(--color-paper)",
+            color: isUser ? "#fff" : "var(--color-text)",
+            border: isUser ? "none" : "1px solid var(--color-border)",
           }}
         >
-          <div className="whitespace-pre-wrap">
-            {isUser ? (
-              msg.content
-            ) : (
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                allowedElements={["p", "ul", "ol", "li", "h1", "h2", "h3", "code", "pre", "strong", "em", "a", "br", "hr", "blockquote", "table", "thead", "tbody", "tr", "th", "td"]}
-                components={{
-                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                  ul: ({ children }) => <ul className="mb-2 list-disc pl-5">{children}</ul>,
-                  ol: ({ children }) => <ol className="mb-2 list-decimal pl-5">{children}</ol>,
-                  li: ({ children }) => <li className="mb-1">{children}</li>,
-                  h1: ({ children }) => <h1 className="mb-2 text-xl font-bold">{children}</h1>,
-                  h2: ({ children }) => <h2 className="mb-2 text-lg font-bold">{children}</h2>,
-                  h3: ({ children }) => <h3 className="mb-2 text-base font-semibold">{children}</h3>,
-                  code: ({ children }) => (
-                    <code className="rounded bg-black/20 px-1.5 py-0.5 font-mono text-xs">
-                      {children}
-                    </code>
-                  ),
-                  pre: ({ children }) => (
-                    <pre className="mb-2 overflow-x-auto rounded-lg bg-black/20 p-3">
-                      {children}
-                    </pre>
-                  ),
-                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                  em: ({ children }) => <em className="italic">{children}</em>,
-                  a: ({ href, children }) => {
-                    const sanitized = href?.startsWith("http://") || href?.startsWith("https://") ? href : undefined;
-                    return (
-                      <a href={sanitized} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2" style={{ color: "var(--cp-primary)" }}>
-                        {children}
-                      </a>
-                    );
-                  },
-                }}
-              >
-                {msg.content}
-              </ReactMarkdown>
-            )}
-          </div>
+          {isUser ? (
+            msg.content
+          ) : (
+            <Suspense fallback={<span className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</span>}>
+              <MarkdownRenderer content={msg.content} />
+            </Suspense>
+          )}
         </div>
         {msg.sources && msg.sources.length > 0 && !isUser && (
-          <motion.div
-            className="flex flex-wrap gap-1"
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
+          <div className="mt-1 flex flex-wrap gap-1 px-1">
             {msg.sources.map((src) => (
-              <span
-                key={src}
-                className="rounded-full px-2 py-0.5 text-xs"
-                style={{ background: "var(--cp-surface-2)", color: "var(--cp-text-muted)" }}
-              >
-                {src}
-              </span>
+              <span key={src} className="rounded-full px-2 py-0.5 text-[10px]" style={{ background: "var(--color-paper-2)", color: "var(--color-text-dim)" }}>{src}</span>
             ))}
-          </motion.div>
+          </div>
         )}
       </div>
     </motion.div>
   );
 }
 
-function SuggestionCard({ text, onClick }: { text: string; onClick: () => void }) {
+function SuggestionStrip({ items, onSelect }: { items: string[]; onSelect: (text: string) => void }) {
   return (
-    <motion.button
-      onClick={onClick}
-      className="text-left rounded-xl border px-4 py-3 text-sm transition-all hover:border-indigo-500/50 hover:bg-indigo-500/5"
-      style={{ borderColor: "var(--cp-border)", color: "var(--cp-text)" }}
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
+    <motion.div
+      className="flex gap-2 overflow-x-auto pb-1"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
     >
-      {text}
-    </motion.button>
+      {items.map((text) => (
+        <motion.button
+          key={text}
+          onClick={() => onSelect(text)}
+          className="shrink-0 rounded-xl border px-3.5 py-2 text-left text-xs whitespace-nowrap transition-all"
+          style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)", background: "var(--color-paper)" }}
+          whileHover={{ borderColor: "var(--color-accent)", color: "var(--color-accent)" }}
+          whileTap={{ scale: 0.97 }}
+        >
+          {text}
+        </motion.button>
+      ))}
+    </motion.div>
   );
 }
 
 export default function ChatPage() {
+  const { user } = useUser();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "👋 Hey! I'm your CareerPilot AI assistant. I've analyzed your CV and I'm ready to help you navigate your career journey.\n\nWhat would you like to explore?",
+      content: "Hey! I'm your CareerPilot AI assistant. I've analyzed your CV and I'm ready to help.\n\nWhat would you like to explore?",
     },
   ]);
   const [input, setInput] = useState("");
@@ -174,29 +128,17 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load prior chat history on mount. Backend currently returns [] until
-  // GET /api/chat/messages is exposed; this call is a no-op today and a
-  // safe forward-compat hook.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const history = await getChatHistory("demo_user_123");
+        const history = await getChatHistory(user?.id || "demo_user_123");
         if (cancelled || !history || history.length === 0) return;
-        setMessages(
-          history.map((m) => ({
-            role: m.role as "user" | "assistant",
-            content: m.content,
-          }))
-        );
+        setMessages(history.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })));
         setShowSuggestions(false);
-      } catch {
-        // Silently fall back to fresh session.
-      }
+      } catch {}
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -212,15 +154,10 @@ export default function ChatPage() {
     setLoading(true);
     try {
       const { answer, sources } = await sendChatMessage(trimmed);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: answer, sources },
-      ]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Sorry, I couldn't process that. Please try again." },
-      ]);
+      setMessages((prev) => [...prev, { role: "assistant", content: answer, sources }]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Sorry, I couldn't process that. Please try again.";
+      setMessages((prev) => [...prev, { role: "assistant", content: msg }]);
     }
     setLoading(false);
   }
@@ -235,53 +172,32 @@ export default function ChatPage() {
   return (
     <motion.div
       className="flex h-[calc(100vh-8rem)] flex-col"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
     >
-      {/* Header */}
-      <motion.div
-        className="mb-4 flex items-center justify-between"
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-      >
+      <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">AI Career Chat</h1>
-          <p className="text-sm" style={{ color: "var(--cp-text-muted)" }}>
-            Responses grounded in your uploaded CV
-          </p>
+          <h1 className="text-xl" style={{ fontFamily: "var(--font-display)", color: "var(--color-text)" }}>AI Career Chat</h1>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Responses grounded in your uploaded CV</p>
         </div>
         <motion.button
           onClick={() => {
-            setMessages([{
-              role: "assistant",
-              content: "👋 Hey! I'm your CareerPilot AI assistant. I've analyzed your CV and I'm ready to help you navigate your career journey.\n\nWhat would you like to explore?",
-            }]);
+            setMessages([{ role: "assistant", content: "Hey! I'm your CareerPilot AI assistant. I've analyzed your CV and I'm ready to help.\n\nWhat would you like to explore?" }]);
             setShowSuggestions(true);
           }}
-          className="flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors hover:bg-indigo-500/10"
-          style={{ borderColor: "var(--cp-border)", color: "var(--cp-text-muted)" }}
+          className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium"
+          style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          <RefreshCw className="h-4 w-4" />
+          <RefreshCw className="h-3.5 w-3.5" />
           New chat
         </motion.button>
-      </motion.div>
+      </div>
 
-      {/* Banner */}
-      <motion.div
-        className="mb-4 rounded-xl border p-3 text-sm"
-        style={{ background: "var(--cp-primary-glow)", borderColor: "rgba(99,102,241,0.3)", color: "var(--cp-text-muted)" }}
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        💡 Responses are grounded in your uploaded CV. <a href="/profile" className="underline" style={{ color: "var(--cp-primary)" }}>Upload a new CV</a> to update your profile.
-      </motion.div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto pb-4">
-        <div className="space-y-4">
+      <div className="flex-1 overflow-y-auto pb-3">
+        <div className="space-y-3">
           <AnimatePresence>
             {messages.map((msg, i) => (
               <MessageBubble key={i} msg={msg} index={i} />
@@ -291,41 +207,25 @@ export default function ChatPage() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Suggestions */}
         <AnimatePresence>
           {showSuggestions && messages.length <= 2 && (
-            <motion.div
-              className="mt-6 grid gap-3 sm:grid-cols-2"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-            >
-              {SUGGESTIONS.map((s, i) => (
-                <motion.div key={s} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}>
-                  <SuggestionCard
-                    text={s}
-                    onClick={() => handleSend(s)}
-                  />
-                </motion.div>
-              ))}
-            </motion.div>
+            <div className="mt-5 space-y-2">
+              <p className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>Try asking</p>
+              <SuggestionStrip items={SUGGESTIONS} onSelect={handleSend} />
+            </div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Input */}
       <motion.div
-        className="overflow-hidden rounded-2xl border"
-        style={{ background: "var(--cp-surface)", borderColor: "var(--cp-border)" }}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
+        className="rounded-xl border"
+        style={{ background: "var(--color-paper)", borderColor: "var(--color-border)" }}
       >
-        <div className="flex items-end gap-2 p-3">
+        <div className="flex items-end gap-2 p-2.5">
           <textarea
             ref={textareaRef}
-            className="flex-1 resize-none bg-transparent py-1 text-sm outline-none"
-            style={{ color: "var(--cp-text)" }}
+            className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none"
+            style={{ color: "var(--color-text)", maxHeight: "120px" }}
             placeholder="Ask about your career…"
             rows={1}
             value={input}
@@ -340,17 +240,13 @@ export default function ChatPage() {
           <motion.button
             onClick={() => handleSend(input)}
             disabled={loading || !input.trim()}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 text-white disabled:opacity-40"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white disabled:opacity-40"
+            style={{ background: "var(--color-accent)" }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
             {loading ? (
-              <motion.div
-                className="h-4 w-4 rounded-full border-2 border-t-transparent"
-                style={{ borderColor: "white", borderTopColor: "transparent" }}
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              />
+              <motion.div className="h-4 w-4 rounded-full border-2 border-t-transparent" style={{ borderColor: "white", borderTopColor: "transparent" }} animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} />
             ) : (
               <Send className="h-4 w-4" />
             )}
