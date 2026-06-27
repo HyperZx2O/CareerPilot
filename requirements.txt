@@ -1,2 +1,1 @@
 -r backend/requirements.txt
--r integrations/requirements.txt
