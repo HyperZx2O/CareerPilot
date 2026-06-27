@@ -105,6 +105,11 @@ async def _check_groq():
     except Exception:
         return False
 
+@app.get("/", tags=["system"])
+async def root():
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(url="/health")
+
 @app.get("/health", tags=["system"])
 async def health_check():
     supabase_ok, pinecone_ok, groq_ok = await asyncio.gather(
