@@ -26,9 +26,8 @@ import { useAppStore } from "@/store/useAppStore";
 // Configuration
 // -----------------------------------------------------------------------------
 
-// All API calls use relative paths through Next.js rewrites (no CORS/CSP issues).
-// Set NEXT_PUBLIC_API_URL on Vercel to point at your Render backend for the proxy.
-const API_BASE = "";
+const API_BASE =
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) || "";
 
 // -----------------------------------------------------------------------------
 // Error type
@@ -86,7 +85,7 @@ export async function apiFetch<T = unknown>(
     }
   }
 
-  const url = path;
+  const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 45000);
