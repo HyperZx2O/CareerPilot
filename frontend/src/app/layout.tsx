@@ -12,6 +12,9 @@ export const metadata: Metadata = {
   title: "CareerPilot — AI Career OS",
   description:
     "AI-first career operating system. Upload your CV, search jobs with fit scores, get personalized career guidance, and track your progress.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
