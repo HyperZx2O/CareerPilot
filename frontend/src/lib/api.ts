@@ -27,7 +27,7 @@ import { useAppStore } from "@/store/useAppStore";
 // -----------------------------------------------------------------------------
 
 const API_BASE =
-  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) || "";
+  ((typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) || "").replace(/\/+$/, "");
 
 // -----------------------------------------------------------------------------
 // Error type
