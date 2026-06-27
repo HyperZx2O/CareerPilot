@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.RENDER_API_URL || "";
+const apiUrl = (process.env.NEXT_PUBLIC_API_URL || process.env.RENDER_API_URL || "").replace(/\/+$/, "");
 let apiOrigin = "";
 try {
   apiOrigin = apiUrl ? new URL(apiUrl).origin : "";
